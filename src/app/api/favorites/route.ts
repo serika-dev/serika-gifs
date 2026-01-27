@@ -33,7 +33,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     })
 
-    const gifs = favorites.map((fav) => ({
+    const gifs = favorites.map((fav: typeof favorites[number]) => ({
       id: fav.gif.id,
       slug: fav.gif.slug,
       title: fav.gif.title,
@@ -42,7 +42,7 @@ export async function GET() {
       thumbnailUrl: fav.gif.thumbnailUrl,
       width: fav.gif.width,
       height: fav.gif.height,
-      size: fav.gif.size,
+      fileSize: fav.gif.fileSize,
       views: fav.gif.views,
       source: fav.gif.source,
       createdAt: fav.gif.createdAt.toISOString(),

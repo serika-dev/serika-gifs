@@ -61,13 +61,13 @@ export async function GET(
         description: collection.description,
         isPublic: collection.isPublic,
         user: collection.user,
-        gifs: collection.gifs.map((g) => ({
+        gifs: collection.gifs.map((g: typeof collection.gifs[number]) => ({
           id: g.gif.id,
           slug: g.gif.slug,
           title: g.gif.title,
           url: g.gif.url,
           thumbnailUrl: g.gif.thumbnailUrl,
-          tags: g.gif.tags.map((t) => t.tag.name),
+          tags: g.gif.tags.map((t: { tag: { name: string } }) => t.tag.name),
           addedAt: g.addedAt,
         })),
         createdAt: collection.createdAt,

@@ -48,7 +48,7 @@ export default async function CollectionsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {collections.map((collection) => (
+            {collections.map((collection: typeof collections[number]) => (
               <Link key={collection.id} href={`/collection/${collection.id}`}>
                 <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
                   <CardHeader className="pb-2">

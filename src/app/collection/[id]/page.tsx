@@ -25,19 +25,27 @@ async function getCollection(id: string) {
       },
       gifs: {
         include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              avatar: true,
+          gif: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  avatar: true,
+                },
+              },
+              tags: {
+                include: {
+                  tag: true,
+                },
+              },
+              _count: {
+                select: { favorites: true },
+              },
             },
           },
-          tags: true,
-          _count: {
-            select: { favorites: true },
-          },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { addedAt: 'desc' },
       },
       _count: {
         select: { gifs: true },
@@ -57,22 +65,22 @@ export default async function CollectionPage({ params }: Props) {
   }
 
   // Transform gifs for GifGrid format
-  const gifs = collection.gifs.map(gif => ({
-    id: gif.id,
-    slug: gif.slug,
-    title: gif.title,
-    description: gif.description,
-    url: gif.url,
-    thumbnailUrl: gif.thumbnailUrl,
-    width: gif.width,
-    height: gif.height,
-    size: gif.size,
-    views: gif.views,
-    source: gif.source,
-    createdAt: gif.createdAt.toISOString(),
-    user: gif.user,
-    tags: gif.tags,
-    _count: gif._count,
+  const gifs = collection.gifs.map((item: typeof collection.gifs[number]) => ({
+    id: item.gif.id,
+    slug: item.gif.slug,
+    title: item.gif.title,
+    description: item.gif.description,
+    url: item.gif.url,
+    thumbnailUrl: item.gif.thumbnailUrl,
+    width: item.gif.width,
+    height: item.gif.height,
+    fileSize: item.gif.fileSize,
+    views: item.gif.views,
+    source: item.gif.source,
+    createdAt: item.gif.createdAt.toISOString(),
+    user: item.gif.user,
+    tags: item.gif.tags.map((t: { tag: { name: string } }) => t.tag.name),
+    _count: item.gif._count,
   }))
 
   return (
