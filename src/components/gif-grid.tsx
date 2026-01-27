@@ -34,10 +34,11 @@ export function GifGrid({
   const [isLoading, setIsLoading] = useState(!initialGifs)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
+  // Responsive grid classes with better mobile support
   const gridClasses = {
-    default: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
-    compact: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8',
-    wide: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+    default: 'grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
+    compact: 'grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8',
+    wide: 'grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
   }
 
   const fetchGifs = useCallback(async (pageNum: number, append: boolean = false) => {
@@ -90,7 +91,7 @@ export function GifGrid({
 
   if (isLoading) {
     return (
-      <div className={`grid ${gridClasses[columns]} gap-3`}>
+      <div className={`grid ${gridClasses[columns]} gap-2 sm:gap-3`}>
         {Array.from({ length: 12 }).map((_, i) => (
           <GifCardSkeleton key={i} />
         ))}
@@ -100,27 +101,29 @@ export function GifGrid({
 
   if (gifs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-        <p className="text-lg">{emptyMessage}</p>
-        <p className="text-sm">{emptySubMessage}</p>
+      <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-muted-foreground px-4">
+        <p className="text-base sm:text-lg text-center">{emptyMessage}</p>
+        <p className="text-xs sm:text-sm text-center mt-1">{emptySubMessage}</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className={`grid ${gridClasses[columns]} gap-3`}>
+    <div className="space-y-4 sm:space-y-6">
+      <div className={`grid ${gridClasses[columns]} gap-2 sm:gap-3`}>
         {gifs.map((gif) => (
           <GifCard key={gif.id} gif={gif} />
         ))}
       </div>
 
       {hasMore && (
-        <div className="flex justify-center">
+        <div className="flex justify-center pt-2">
           <Button
             variant="outline"
             onClick={loadMore}
             disabled={isLoadingMore}
+            className="w-full sm:w-auto min-w-[140px]"
+            size="lg"
           >
             {isLoadingMore ? (
               <>

@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { 
   Search, 
   Upload,
@@ -47,14 +47,15 @@ export function Header() {
     if (searchQuery.trim()) {
       router.push(`/search?q=${encodeURIComponent(searchQuery)}`)
       setSearchQuery('')
+      setMobileMenuOpen(false)
     }
   }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-6">
-          <Logo width={130} height={20} />
+      <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4">
+        <div className="flex items-center gap-4 sm:gap-6">
+          <Logo width={110} height={18} className="sm:w-[130px] sm:h-[20px]" />
           
           <nav className="hidden md:flex items-center gap-4">
             {NAV_LINKS.map((link) => (
@@ -69,6 +70,7 @@ export function Header() {
           </nav>
         </div>
 
+        {/* Desktop search */}
         <form onSubmit={handleSearch} className="flex-1 max-w-md mx-4 hidden sm:block">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -77,18 +79,18 @@ export function Header() {
               placeholder="Search GIFs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-muted/50 border-transparent focus:border-primary"
+              className="pl-10 bg-muted/50 border-transparent focus:border-primary h-9"
             />
           </div>
         </form>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {isLoading ? (
-            <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
+            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-muted animate-pulse" />
           ) : user ? (
             <>
-              <Link href="/upload">
-                <Button variant="ghost" size="sm" className="hidden sm:flex">
+              <Link href="/upload" className="hidden sm:block">
+                <Button variant="ghost" size="sm" className="h-9">
                   <Upload className="h-4 w-4 mr-2" />
                   Upload
                 </Button>
@@ -96,10 +98,10 @@ export function Header() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                    <Avatar className="h-9 w-9">
+                  <Button variant="ghost" className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full p-0">
+                    <Avatar className="h-8 w-8 sm:h-9 sm:w-9">
                       <AvatarImage src={user.avatar || undefined} alt={user.username} />
-                      <AvatarFallback className="bg-primary/10 text-primary">
+                      <AvatarFallback className="bg-primary/10 text-primary text-sm">
                         {user.username.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -165,12 +167,12 @@ export function Header() {
           ) : (
             <>
               <Link href="/login">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="h-8 sm:h-9 px-2 sm:px-3 text-sm">
                   Sign in
                 </Button>
               </Link>
-              <Link href="/register">
-                <Button size="sm" className="hidden sm:flex">
+              <Link href="/register" className="hidden sm:block">
+                <Button size="sm" className="h-9">
                   Sign up
                 </Button>
               </Link>
@@ -180,13 +182,17 @@ export function Header() {
           {/* Mobile Menu */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
+              <Button variant="ghost" size="icon" className="md:hidden h-8 w-8 sm:h-9 sm:w-9">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-80">
-              <div className="flex flex-col gap-6 mt-6">
-                <form onSubmit={handleSearch}>
+            <SheetContent side="right" className="w-[85vw] max-w-[320px] p-0">
+              <SheetHeader className="px-4 pt-4 pb-2 text-left">
+                <SheetTitle className="text-lg">Menu</SheetTitle>
+              </SheetHeader>
+              <div className="flex flex-col h-full px-4 pb-6">
+                {/* Mobile search */}
+                <form onSubmit={handleSearch} className="mb-4">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -194,17 +200,18 @@ export function Header() {
                       placeholder="Search GIFs..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 h-11"
                     />
                   </div>
                 </form>
 
-                <nav className="flex flex-col gap-2">
+                {/* Navigation links */}
+                <nav className="flex flex-col gap-1 mb-4">
                   {NAV_LINKS.map((link) => (
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="py-2 text-foreground hover:text-primary transition-colors"
+                      className="py-3 px-3 rounded-lg text-foreground hover:bg-muted active:bg-muted/80 transition-colors text-base font-medium"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {link.label}
@@ -212,55 +219,106 @@ export function Header() {
                   ))}
                 </nav>
 
+                {/* User section */}
                 {user ? (
-                  <div className="flex flex-col gap-2 pt-4 border-t">
-                    <div className="flex items-center gap-3 py-2">
-                      <Avatar className="h-10 w-10">
+                  <div className="flex flex-col gap-1 pt-4 border-t">
+                    {/* User info */}
+                    <div className="flex items-center gap-3 py-3 px-3 mb-2">
+                      <Avatar className="h-11 w-11">
                         <AvatarImage src={user.avatar || undefined} alt={user.username} />
                         <AvatarFallback className="bg-primary/10 text-primary">
                           {user.username.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <p className="font-medium">{user.username}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{user.username}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                       </div>
                     </div>
                     
-                    <Link href="/upload" className="py-2" onClick={() => setMobileMenuOpen(false)}>
-                      <Upload className="inline mr-2 h-4 w-4" />
-                      Upload
+                    {/* User actions */}
+                    <Link 
+                      href="/upload" 
+                      className="py-3 px-3 rounded-lg hover:bg-muted active:bg-muted/80 transition-colors flex items-center gap-3"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">Upload</span>
                     </Link>
-                    <Link href={`/user/${user.username}`} className="py-2" onClick={() => setMobileMenuOpen(false)}>
-                      <User className="inline mr-2 h-4 w-4" />
-                      Profile
+                    <Link 
+                      href={`/user/${user.username}`} 
+                      className="py-3 px-3 rounded-lg hover:bg-muted active:bg-muted/80 transition-colors flex items-center gap-3"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <User className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">Profile</span>
+                    </Link>
+                    <Link 
+                      href="/favorites" 
+                      className="py-3 px-3 rounded-lg hover:bg-muted active:bg-muted/80 transition-colors flex items-center gap-3"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Heart className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">Favorites</span>
+                    </Link>
+                    <Link 
+                      href="/my-collections" 
+                      className="py-3 px-3 rounded-lg hover:bg-muted active:bg-muted/80 transition-colors flex items-center gap-3"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <FolderOpen className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">My Collections</span>
+                    </Link>
+                    <Link 
+                      href="/settings" 
+                      className="py-3 px-3 rounded-lg hover:bg-muted active:bg-muted/80 transition-colors flex items-center gap-3"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Settings className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">Settings</span>
                     </Link>
                     
                     {user.isAdmin && (
-                      <Link href="/admin" className="py-2" onClick={() => setMobileMenuOpen(false)}>
-                        <Shield className="inline mr-2 h-4 w-4" />
-                        Admin
-                      </Link>
+                      <>
+                        <div className="border-t my-2" />
+                        <Link 
+                          href="/admin" 
+                          className="py-3 px-3 rounded-lg hover:bg-muted active:bg-muted/80 transition-colors flex items-center gap-3"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <Shield className="h-5 w-5 text-muted-foreground" />
+                          <span className="font-medium">Admin</span>
+                        </Link>
+                        <Link 
+                          href="/admin/import" 
+                          className="py-3 px-3 rounded-lg hover:bg-muted active:bg-muted/80 transition-colors flex items-center gap-3"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <Download className="h-5 w-5 text-muted-foreground" />
+                          <span className="font-medium">Import GIFs</span>
+                        </Link>
+                      </>
                     )}
                     
+                    <div className="border-t my-2" />
                     <button 
                       onClick={() => {
                         handleLogout()
                         setMobileMenuOpen(false)
                       }}
-                      className="py-2 text-left text-destructive"
+                      className="py-3 px-3 rounded-lg hover:bg-destructive/10 active:bg-destructive/20 transition-colors flex items-center gap-3 text-left text-destructive"
                     >
-                      <LogOut className="inline mr-2 h-4 w-4" />
-                      Log out
+                      <LogOut className="h-5 w-5" />
+                      <span className="font-medium">Log out</span>
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-2 pt-4 border-t">
+                  <div className="flex flex-col gap-2 pt-4 border-t mt-auto">
                     <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                      <Button variant="outline" className="w-full">Sign in</Button>
+                      <Button variant="outline" className="w-full h-11 text-base">Sign in</Button>
                     </Link>
                     <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
-                      <Button className="w-full">Sign up</Button>
+                      <Button className="w-full h-11 text-base">Sign up</Button>
                     </Link>
                   </div>
                 )}
