@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       prisma.gif.count({ where }),
     ])
 
-    const formattedGifs = gifs.map((gif) => ({
+    const formattedGifs = gifs.map((gif: typeof gifs[number]) => ({
       id: gif.id,
       slug: gif.slug,
       title: gif.title,
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
       source: gif.source,
       views: gif.views,
       favorites: gif._count.favorites,
-      tags: gif.tags.map((t) => t.tag.name),
+      tags: gif.tags.map((t: { tag: { name: string } }) => t.tag.name),
       user: gif.user,
       createdAt: gif.createdAt,
     }))
