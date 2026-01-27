@@ -63,7 +63,7 @@ export async function GET(
         sourceUrl: gif.sourceUrl,
         views: gif.views + 1,
         favorites: gif._count.favorites,
-        tags: gif.tags.map((t) => t.tag.name),
+        tags: gif.tags.map((t: { tag: { name: string } }) => t.tag.name),
         user: gif.user,
         createdAt: gif.createdAt,
       },
