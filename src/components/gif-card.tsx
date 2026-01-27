@@ -75,7 +75,7 @@ export function GifCard({
         {/* Image with next/image for optimization */}
         <Image
           src={isHovered ? gif.url : (gif.thumbnailUrl || gif.url)}
-          alt={gif.title || 'GIF'}
+          alt={gif.title || 'Animated GIF'}
           fill
           className="object-cover"
           sizes="(max-width: 480px) 50vw, (max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 16vw"

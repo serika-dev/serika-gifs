@@ -16,7 +16,6 @@ import {
   XCircle,
   Image as ImageIcon,
   History,
-  ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
@@ -50,7 +49,6 @@ interface PaginationInfo {
   currentPage: number
   totalCount: number
   hasNextPage: boolean
-  hasPrevPage: boolean
   nextPos?: string
 }
 
@@ -67,17 +65,19 @@ export default function AdminImportPage() {
     currentPage: 1,
     totalCount: 0,
     hasNextPage: false,
-    hasPrevPage: false,
   })
 
-  const handleSearch = useCallback(async (page: number = 1, pos?: string) => {
+  const handleSearch = useCallback(async (resetPage: boolean = true, pos?: string) => {
     if (!searchQuery.trim()) {
       toast.error('Please enter a search query')
       return
     }
 
     setIsSearching(true)
-    if (page === 1) {
+    
+    // Reset on new search
+    const pageNum = resetPage ? 1 : pagination.currentPage + 1
+    if (resetPage) {
       setPreviews([])
     }
 
@@ -85,7 +85,6 @@ export default function AdminImportPage() {
       const params = new URLSearchParams({
         query: searchQuery,
         limit: '20',
-        page: page.toString(),
       })
       if (pos) {
         params.set('pos', pos)
@@ -101,10 +100,9 @@ export default function AdminImportPage() {
 
       setPreviews(data.results || [])
       setPagination({
-        currentPage: page,
+        currentPage: pageNum,
         totalCount: data.totalCount || data.results?.length || 0,
         hasNextPage: data.hasNextPage || false,
-        hasPrevPage: page > 1,
         nextPos: data.nextPos,
       })
       
@@ -116,7 +114,7 @@ export default function AdminImportPage() {
     } finally {
       setIsSearching(false)
     }
-  }, [searchQuery, activeTab])
+  }, [searchQuery, activeTab, pagination.currentPage])
 
   const handleImport = async () => {
     if (!searchQuery.trim()) {
@@ -127,14 +125,14 @@ export default function AdminImportPage() {
     setIsImporting(true)
 
     try {
+      // Import the currently displayed results by re-fetching with the same query
+      // Note: This re-searches and imports - it doesn't use cached results
       const response = await fetch(`/api/admin/import/${activeTab}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           query: searchQuery, 
           limit: 20,
-          page: pagination.currentPage,
-          pos: pagination.nextPos 
         }),
       })
       
@@ -226,9 +224,10 @@ export default function AdminImportPage() {
     loadImportJobs()
   }, [])
 
-  const goToPage = (page: number) => {
-    if (page < 1) return
-    handleSearch(page, page > pagination.currentPage ? pagination.nextPos : undefined)
+  const loadNextPage = () => {
+    if (pagination.hasNextPage && pagination.nextPos) {
+      handleSearch(false, pagination.nextPos)
+    }
   }
 
   const getSourceLabel = (source: string) => {
@@ -281,7 +280,8 @@ export default function AdminImportPage() {
                 <Tabs value={activeTab} onValueChange={(tab) => {
                   setActiveTab(tab)
                   setPreviews([])
-                  setPagination({ currentPage: 1, totalCount: 0, hasNextPage: false, hasPrevPage: false })
+                  setSearchQuery('')
+                  setPagination({ currentPage: 1, totalCount: 0, hasNextPage: false })
                 }}>
                   <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6 h-auto">
                     <TabsTrigger value="tenor" className="text-xs sm:text-sm py-2 sm:py-1.5">Tenor</TabsTrigger>
@@ -299,13 +299,13 @@ export default function AdminImportPage() {
                           placeholder={`Search ${getSourceLabel(activeTab)} for GIFs...`}
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSearch(1)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSearch(true)}
                           className="bg-background/50 h-10 sm:h-9"
                         />
                       </div>
                       <div className="flex gap-2">
                         <Button
-                          onClick={() => handleSearch(1)}
+                          onClick={() => handleSearch(true)}
                           disabled={isSearching}
                           className="flex-1 sm:flex-none h-10 sm:h-9"
                         >
@@ -335,28 +335,30 @@ export default function AdminImportPage() {
                           )}
                           <span className="ml-2">Import Page ({previews.length})</span>
                         </Button>
-                        <Button
-                          onClick={handleImportAllPages}
-                          disabled={isImporting || isImportingAll || !searchQuery.trim()}
-                          variant="secondary"
-                          className="flex-1 sm:flex-none h-10 sm:h-9"
-                        >
-                          {isImportingAll ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <ChevronsRight className="h-4 w-4" />
-                          )}
-                          <span className="ml-2">Import All Pages</span>
-                        </Button>
+                        {pagination.hasNextPage && (
+                          <Button
+                            onClick={handleImportAllPages}
+                            disabled={isImporting || isImportingAll || !searchQuery.trim()}
+                            variant="secondary"
+                            className="flex-1 sm:flex-none h-10 sm:h-9"
+                          >
+                            {isImportingAll ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ChevronsRight className="h-4 w-4" />
+                            )}
+                            <span className="ml-2">Import All Pages</span>
+                          </Button>
+                        )}
                       </div>
                     )}
 
                     {/* Results info */}
-                    {pagination.totalCount > 0 && (
+                    {previews.length > 0 && (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm text-muted-foreground">
                         <span>
                           Showing {previews.length} results
-                          {pagination.totalCount > 0 && ` (Total: ~${pagination.totalCount}+)`}
+                          {pagination.totalCount > previews.length && ` (more available)`}
                         </span>
                         <span>Page {pagination.currentPage}</span>
                       </div>
@@ -372,38 +374,29 @@ export default function AdminImportPage() {
                       <GifGrid previews={previews} isLoading={isSearching} />
                     </TabsContent>
 
-                    {/* Pagination controls */}
-                    {(pagination.hasPrevPage || pagination.hasNextPage) && (
-                      <div className="flex items-center justify-center gap-1 sm:gap-2 pt-4">
+                    {/* Pagination controls - Forward-only navigation */}
+                    {pagination.hasNextPage && (
+                      <div className="flex items-center justify-center gap-2 pt-4">
                         <Button
                           variant="outline"
-                          size="icon"
-                          className="h-9 w-9 sm:h-8 sm:w-8"
-                          onClick={() => goToPage(1)}
-                          disabled={!pagination.hasPrevPage || isSearching}
+                          onClick={() => handleSearch(true)}
+                          disabled={isSearching}
+                          className="h-9"
                         >
-                          <ChevronsLeft className="h-4 w-4" />
+                          <ChevronsLeft className="h-4 w-4 mr-2" />
+                          Back to First
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-9 w-9 sm:h-8 sm:w-8"
-                          onClick={() => goToPage(pagination.currentPage - 1)}
-                          disabled={!pagination.hasPrevPage || isSearching}
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <span className="px-3 sm:px-4 py-2 text-sm font-medium min-w-[80px] text-center">
+                        <span className="px-3 py-2 text-sm font-medium">
                           Page {pagination.currentPage}
                         </span>
                         <Button
                           variant="outline"
-                          size="icon"
-                          className="h-9 w-9 sm:h-8 sm:w-8"
-                          onClick={() => goToPage(pagination.currentPage + 1)}
+                          onClick={loadNextPage}
                           disabled={!pagination.hasNextPage || isSearching}
+                          className="h-9"
                         >
-                          <ChevronRight className="h-4 w-4" />
+                          Next Page
+                          <ChevronRight className="h-4 w-4 ml-2" />
                         </Button>
                       </div>
                     )}
@@ -514,7 +507,7 @@ function GifGrid({ previews, isLoading }: { previews: GifPreview[], isLoading: b
         >
           <Image
             src={gif.preview || gif.url}
-            alt={gif.title || 'GIF preview'}
+            alt={gif.title || 'Animated GIF preview'}
             fill
             className="object-cover"
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
