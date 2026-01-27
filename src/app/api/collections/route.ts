@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     ])
 
     return NextResponse.json({
-      collections: collections.map((col) => ({
+      collections: collections.map((col: typeof collections[number]) => ({
         id: col.id,
         name: col.name,
         slug: col.slug,
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
         isPublic: col.isPublic,
         user: col.user,
         gifCount: col._count.gifs,
-        previewGifs: col.gifs.map((g) => ({
+        previewGifs: col.gifs.map((g: typeof col.gifs[number]) => ({
           url: g.gif.url,
           thumbnailUrl: g.gif.thumbnailUrl,
         })),

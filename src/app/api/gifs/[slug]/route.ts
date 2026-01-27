@@ -107,7 +107,7 @@ export async function PATCH(
     }
 
     // Check ownership or admin
-    if (gif.userId !== session.userId && !session.isAdmin) {
+    if (gif.userId !== session.id && !session.isAdmin) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
@@ -196,7 +196,7 @@ export async function DELETE(
     }
 
     // Check ownership or admin
-    if (gif.userId !== session.userId && !session.isAdmin) {
+    if (gif.userId !== session.id && !session.isAdmin) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }

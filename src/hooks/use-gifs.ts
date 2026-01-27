@@ -12,7 +12,7 @@ export interface Gif {
   thumbnailUrl?: string | null
   width: number
   height: number
-  size: number
+  fileSize: number
   views: number
   source: string
   createdAt: string
@@ -21,7 +21,7 @@ export interface Gif {
     username: string
     avatar?: string | null
   }
-  tags?: {
+  tags?: string[] | {
     id: string
     name: string
     slug: string
