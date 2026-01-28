@@ -49,18 +49,29 @@ async function searchKlipy(query: string, limit: number = 20, page?: string): Pr
     {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'application/json',
       },
     }
   )
 
   if (!response.ok) {
-    throw new Error('Klipy API request failed')
+    const errorText = await response.text().catch(() => 'Unknown error')
+    console.error('Klipy API error:', response.status, errorText)
+    throw new Error(`Klipy API request failed: ${response.status}`)
   }
 
-  const data = await response.json()
+  const text = await response.text()
+  let data
+  try {
+    data = JSON.parse(text)
+  } catch (e) {
+    console.error('Klipy JSON parse error:', text.substring(0, 500))
+    throw new Error('Invalid JSON response from Klipy API')
+  }
+  
   return {
-    results: data.results || data.data || [],
-    nextPage: data.next_page || data.nextPage,
+    results: data.results || data.data || data.gifs || [],
+    nextPage: data.next_page || data.nextPage || data.pagination?.next,
   }
 }
 

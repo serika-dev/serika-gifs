@@ -76,7 +76,7 @@ export default async function HomePage() {
       {/* Popular Tags */}
       {popularTags.length > 0 && (
         <section className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
-          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
+          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-3 custom-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
             <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap shrink-0">Popular:</span>
             {popularTags.map((tag) => (
               <Link key={tag.slug} href={`/tag/${tag.slug}`}>
