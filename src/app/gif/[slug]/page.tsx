@@ -87,7 +87,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description,
       siteName: 'SerikaGifs',
       type: 'video.other',
-      url: `${SITE_URL}/gif/${slug}`,
+      // Point og:url to the GIF file directly - this makes Discord render it as direct media
+      url: gifUrl,
       images: [
         {
           url: gifUrl,
