@@ -14,6 +14,8 @@
     "db:backfill-tags:dry": "bun run scripts/backfill-tags.ts --dry-run --verbose",
     "db:retag-imports": "bun run scripts/retag-imports.ts",
     "db:retag-imports:dry": "bun run scripts/retag-imports.ts --dry-run --verbose",
+    "db:reimport-hires": "bun run scripts/reimport-hires.ts",
+    "db:reimport-hires:dry": "bun run scripts/reimport-hires.ts --dry-run --verbose",
     "db:fix-dimensions": "bun run scripts/fix-dimensions.ts",
     "db:generate-thumbnails": "bun run scripts/generate-thumbnails.ts",
     "db:generate-thumbnails:dry": "bun run scripts/generate-thumbnails.ts --dry-run --verbose",

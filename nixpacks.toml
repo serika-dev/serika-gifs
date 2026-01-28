@@ -1,7 +1,7 @@
 # Nixpacks configuration for Coolify deployment
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "bun", "openssl", "libuuid", "gcc-unwrapped"]
+nixPkgs = ["nodejs_20", "bun", "openssl", "libuuid", "gcc-unwrapped", "ffmpeg"]
 nixLibs = ["openssl", "gcc-unwrapped"]
 
 [phases.install]

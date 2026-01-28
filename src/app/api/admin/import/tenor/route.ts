@@ -34,7 +34,8 @@ async function searchTenor(query: string, limit: number = 20, pos?: string): Pro
     q: query,
     key: apiKey,
     limit: limit.toString(),
-    media_filter: 'gif',
+    // Request gif format for highest quality original GIFs
+    media_filter: 'gif,mediumgif,tinygif',
   })
   
   if (pos) {
@@ -94,7 +95,8 @@ export async function POST(request: NextRequest) {
       // Transform to common format
       const gifsToImport: GifToImport[] = results
         .filter(result => {
-          const gifUrl = result.media_formats?.gif?.url || result.media_formats?.mediumgif?.url
+          // Only import if we have the full quality GIF (not mediumgif)
+          const gifUrl = result.media_formats?.gif?.url
           return gifUrl && !existingMap.has(result.id)
         })
         .map(result => {
@@ -102,7 +104,8 @@ export async function POST(request: NextRequest) {
           return {
             sourceId: result.id,
             title: result.title || result.content_description || query,
-            gifUrl: result.media_formats?.gif?.url || result.media_formats?.mediumgif?.url || '',
+            // Always use the highest quality gif format
+            gifUrl: result.media_formats!.gif!.url,
             previewUrl: result.media_formats?.tinygif?.url,
             sourceUrl: result.url,
             width: dimensions[0] || 0,
