@@ -146,6 +146,7 @@ export async function GET(request: NextRequest) {
       title: gif.title,
       description: gif.description,
       url: gif.url,
+      webmUrl: gif.webmUrl,
       thumbnailUrl: gif.thumbnailUrl,
       width: gif.width,
       height: gif.height,
