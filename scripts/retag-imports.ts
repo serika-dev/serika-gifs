@@ -532,6 +532,18 @@ async function main() {
     console.log(`  ${(i + 1).toString().padStart(2)}. ${tag.padEnd(20)} (${count})`)
   })
   
+  // Clean up orphaned tags (tags with no GIFs)
+  if (!dryRun) {
+    console.log('\n🧹 Cleaning up orphaned tags...')
+    const orphanedTags = await prisma.tag.deleteMany({
+      where: {
+        gifs: { none: {} },
+        slug: { not: 'import' }, // Keep import tag even if empty
+      },
+    })
+    console.log(`   Deleted ${orphanedTags.count} orphaned tags`)
+  }
+  
   if (dryRun) {
     console.log('\n🔸 This was a dry run. Run without --dry-run to apply changes.')
   } else {
