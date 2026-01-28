@@ -1,7 +1,7 @@
 # Nixpacks configuration for Coolify deployment
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "openssl", "libuuid"]
+nixPkgs = ["nodejs_20", "bun", "openssl", "libuuid"]
 
 [phases.install]
 cmds = ["npm ci"]
