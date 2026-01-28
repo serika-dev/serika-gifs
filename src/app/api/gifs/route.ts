@@ -8,6 +8,18 @@ import { nanoid } from 'nanoid'
 import imageSize from 'image-size'
 import { checkRateLimit, rateLimitResponse, addRateLimitHeaders } from '@/lib/rate-limit'
 
+// Handle CORS preflight requests
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  })
+}
+
 // GET /api/gifs - List GIFs (public, rate limited)
 export async function GET(request: NextRequest) {
   try {
