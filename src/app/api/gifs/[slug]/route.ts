@@ -54,6 +54,8 @@ export async function GET(
         title: gif.title,
         description: gif.description,
         url: gif.url,
+        mp4Url: gif.mp4Url,
+        webmUrl: gif.webmUrl,
         thumbnailUrl: gif.thumbnailUrl,
         width: gif.width,
         height: gif.height,

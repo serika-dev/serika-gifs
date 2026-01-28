@@ -19,7 +19,8 @@ interface GiphyGif {
   slug: string
   url: string
   images: {
-    original?: { url: string; width: string; height: string; size: string }
+    original?: { url: string; width: string; height: string; size: string; mp4?: string }
+    original_mp4?: { mp4: string }
     fixed_height_small?: { url: string }
   }
 }
@@ -101,6 +102,7 @@ export async function POST(request: NextRequest) {
           sourceId: result.id,
           title: result.title || query,
           gifUrl: result.images!.original!.url,
+          mp4Url: result.images?.original?.mp4 || result.images?.original_mp4?.mp4,
           previewUrl: result.images?.fixed_height_small?.url,
           sourceUrl: result.url,
           width: parseInt(result.images?.original?.width || '0'),

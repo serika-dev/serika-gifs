@@ -8,6 +8,93 @@ import { Separator } from '@/components/ui/separator'
 import { Eye, Heart, FileType, Maximize } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { formatDistanceToNow } from 'date-fns'
+import type { Metadata } from 'next'
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
+
+async function getGifForMetadata(slug: string) {
+  return prisma.gif.findUnique({
+    where: { slug },
+    select: {
+      title: true,
+      description: true,
+      url: true,
+      mp4Url: true,
+      thumbnailUrl: true,
+      width: true,
+      height: true,
+    },
+  })
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params
+  const gif = await getGifForMetadata(slug)
+  
+  if (!gif) {
+    return {
+      title: 'GIF Not Found',
+    }
+  }
+
+  const title = gif.title || 'GIF'
+  
+  // For Discord/Twitter embeds - use MP4 if available for best quality autoplay
+  // Discord auto-plays MP4s as GIFs when they're under certain size/duration
+  const videoUrl = gif.mp4Url
+  const imageUrl = gif.thumbnailUrl || gif.url
+
+  return {
+    title: `${title} | SerikaGifs`,
+    description: title,
+    openGraph: {
+      title,
+      siteName: 'SerikaGifs',
+      type: 'video.other',
+      url: `${SITE_URL}/gif/${slug}`,
+      // Video tags for Discord autoplay embed
+      videos: videoUrl ? [
+        {
+          url: videoUrl,
+          secureUrl: videoUrl,
+          width: gif.width,
+          height: gif.height,
+          type: 'video/mp4',
+        },
+      ] : undefined,
+      images: [
+        {
+          url: imageUrl,
+          width: gif.width,
+          height: gif.height,
+          alt: title,
+        },
+      ],
+    },
+    twitter: {
+      card: 'player',
+      title,
+      description: title,
+      images: [imageUrl],
+      players: videoUrl ? [
+        {
+          playerUrl: videoUrl,
+          streamUrl: videoUrl,
+          width: gif.width,
+          height: gif.height,
+        },
+      ] : undefined,
+    },
+    other: {
+      // These meta tags are needed for Discord to render video inline
+      'og:video': videoUrl || '',
+      'og:video:secure_url': videoUrl || '',
+      'og:video:type': 'video/mp4',
+      'og:video:width': String(gif.width),
+      'og:video:height': String(gif.height),
+    },
+  }
+}
 
 async function getGif(slug: string) {
   const gif = await prisma.gif.findUnique({
@@ -47,6 +134,8 @@ async function getGif(slug: string) {
     title: gif.title,
     description: gif.description,
     url: gif.url,
+    mp4Url: gif.mp4Url,
+    webmUrl: gif.webmUrl,
     thumbnailUrl: gif.thumbnailUrl,
     width: gif.width,
     height: gif.height,

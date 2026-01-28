@@ -22,6 +22,9 @@ interface TenorGif {
     gif?: { url: string; dims: number[] }
     mediumgif?: { url: string }
     tinygif?: { url: string }
+    mp4?: { url: string }
+    loopedmp4?: { url: string }
+    webm?: { url: string }
   }
 }
 
@@ -34,8 +37,8 @@ async function searchTenor(query: string, limit: number = 20, pos?: string): Pro
     q: query,
     key: apiKey,
     limit: limit.toString(),
-    // Request gif format for highest quality original GIFs
-    media_filter: 'gif,mediumgif,tinygif',
+    // Request all formats including mp4 and webm for highest quality
+    media_filter: 'gif,mediumgif,tinygif,mp4,loopedmp4,webm',
   })
   
   if (pos) {
@@ -101,11 +104,17 @@ export async function POST(request: NextRequest) {
         })
         .map(result => {
           const dimensions = result.media_formats?.gif?.dims || [0, 0]
+          // Get MP4 URL (prefer loopedmp4 for seamless looping)
+          const mp4Url = result.media_formats?.loopedmp4?.url || result.media_formats?.mp4?.url
+          // Get WebM URL (smaller than MP4, good for web)
+          const webmUrl = result.media_formats?.webm?.url
           return {
             sourceId: result.id,
             title: result.title || result.content_description || query,
             // Always use the highest quality gif format
             gifUrl: result.media_formats!.gif!.url,
+            mp4Url,
+            webmUrl,
             previewUrl: result.media_formats?.tinygif?.url,
             sourceUrl: result.url,
             width: dimensions[0] || 0,

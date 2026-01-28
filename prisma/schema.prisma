@@ -28,7 +28,9 @@ model Gif {
   slug          String    @unique
   title         String
   description   String?
-  url           String    // Backblaze URL
+  url           String    // Backblaze URL (GIF)
+  mp4Url        String?   // MP4 URL for video playback
+  webmUrl       String?   // WebM URL for video playback (smaller, better quality)
   thumbnailUrl  String?   // Thumbnail URL
   width         Int
   height        Int

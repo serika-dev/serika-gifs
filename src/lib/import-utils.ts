@@ -17,6 +17,8 @@ export interface GifToImport {
   sourceId: string
   title: string
   gifUrl: string
+  mp4Url?: string  // High quality MP4 URL from source
+  webmUrl?: string // WebM URL from source (Tenor only)
   previewUrl?: string
   sourceUrl?: string
   width?: number
@@ -222,6 +224,32 @@ export async function importSingleGif(
     const key = `gifs/${options.userId}/${slug}.gif`
     const url = await uploadToB2(gifBuffer, key, 'image/gif')
     
+    // Download and upload MP4 to our CDN (instead of linking to external source)
+    let mp4Url: string | null = null
+    if (gif.mp4Url) {
+      try {
+        const mp4Buffer = await downloadFile(gif.mp4Url)
+        const mp4Key = `gifs/${options.userId}/${slug}.mp4`
+        mp4Url = await uploadToB2(mp4Buffer, mp4Key, 'video/mp4')
+      } catch (e) {
+        console.error('Error downloading MP4:', e)
+        // Continue without MP4 - not critical
+      }
+    }
+    
+    // Download and upload WebM to our CDN (Tenor only)
+    let webmUrl: string | null = null
+    if (gif.webmUrl) {
+      try {
+        const webmBuffer = await downloadFile(gif.webmUrl)
+        const webmKey = `gifs/${options.userId}/${slug}.webm`
+        webmUrl = await uploadToB2(webmBuffer, webmKey, 'video/webm')
+      } catch (e) {
+        console.error('Error downloading WebM:', e)
+        // Continue without WebM - not critical
+      }
+    }
+    
     // Generate static WebP thumbnail from the GIF (first frame, compressed)
     let thumbnailUrl: string | null = null
     try {
@@ -261,6 +289,8 @@ export async function importSingleGif(
         slug,
         title: gif.title || options.query,
         url,
+        mp4Url,  // Now using our CDN URL
+        webmUrl, // WebM on our CDN (Tenor only)
         thumbnailUrl,
         width,
         height,

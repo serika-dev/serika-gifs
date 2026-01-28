@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -10,11 +10,16 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { Heart, Copy, Download, Share2, Link as LinkIcon, Code, MoreHorizontal, Loader2, Pencil } from 'lucide-react'
+import { Heart, Copy, Download, Share2, Link as LinkIcon, Code, MoreHorizontal, Loader2, Pencil, Settings2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/auth-context'
 import Link from 'next/link'
+
+type QualityOption = 'webm' | 'mp4' | 'gif'
 
 interface GifViewerProps {
   gif: {
@@ -22,6 +27,8 @@ interface GifViewerProps {
     slug: string
     title: string
     url: string
+    mp4Url?: string | null
+    webmUrl?: string | null
     width: number
     height: number
     user?: {
@@ -36,9 +43,48 @@ export function GifViewer({ gif }: GifViewerProps) {
   const { user } = useAuth()
   const [isFavorited, setIsFavorited] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  // Start with 'gif' for SSR consistency, then load preference after mount
+  const [quality, setQuality] = useState<QualityOption>('gif')
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Check if current user can edit this GIF
   const canEdit = user && gif.user && (user.id === gif.user.id || user.isAdmin)
+
+  // Load quality preference after mount to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+    const saved = localStorage.getItem('gif-quality')
+    if (saved === 'webm' && gif.webmUrl) {
+      setQuality('webm')
+    } else if (saved === 'mp4' && gif.mp4Url) {
+      setQuality('mp4')
+    } else if (saved === 'gif') {
+      setQuality('gif')
+    } else if (gif.webmUrl) {
+      // Default to webm if available (best quality + smallest)
+      setQuality('webm')
+    } else if (gif.mp4Url) {
+      // Fallback to mp4 if available
+      setQuality('mp4')
+    }
+  }, [gif.mp4Url, gif.webmUrl])
+
+  // Save quality preference
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem('gif-quality', quality)
+    }
+  }, [quality, mounted])
+
+  // Get current display URL based on quality
+  const getVideoUrl = () => {
+    if (quality === 'webm' && gif.webmUrl) return gif.webmUrl
+    if (quality === 'mp4' && gif.mp4Url) return gif.mp4Url
+    return null
+  }
+  const videoUrl = getVideoUrl()
+  const showVideo = quality !== 'gif' && videoUrl
 
   useEffect(() => {
     // Check if favorited
@@ -122,11 +168,58 @@ export function GifViewer({ gif }: GifViewerProps) {
   return (
     <Card className="overflow-hidden border-border/50">
       <div className="relative bg-muted flex items-center justify-center min-h-[250px] sm:min-h-[300px]">
-        <img
-          src={gif.url}
-          alt={gif.title}
-          className="max-w-full max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] object-contain w-auto h-auto"
-        />
+        {showVideo ? (
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="max-w-full max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] object-contain w-auto h-auto"
+          />
+        ) : (
+          <img
+            src={gif.url}
+            alt={gif.title}
+            className="max-w-full max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] object-contain w-auto h-auto"
+          />
+        )}
+        
+        {/* Quality Selector - positioned in corner */}
+        {(gif.mp4Url || gif.webmUrl) && (
+          <div className="absolute bottom-2 right-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="sm" className="h-7 px-2 text-xs bg-black/60 hover:bg-black/80 border-0">
+                  <Settings2 className="h-3 w-3 mr-1" />
+                  {quality === 'webm' ? 'WebM' : quality === 'mp4' ? 'MP4' : 'GIF'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuLabel className="text-xs">Quality</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={quality} onValueChange={(v) => setQuality(v as QualityOption)}>
+                  {gif.webmUrl && (
+                    <DropdownMenuRadioItem value="webm" className="text-sm">
+                      WebM
+                      <span className="ml-auto text-xs text-muted-foreground">Best</span>
+                    </DropdownMenuRadioItem>
+                  )}
+                  {gif.mp4Url && (
+                    <DropdownMenuRadioItem value="mp4" className="text-sm">
+                      MP4
+                      <span className="ml-auto text-xs text-muted-foreground">HD</span>
+                    </DropdownMenuRadioItem>
+                  )}
+                  <DropdownMenuRadioItem value="gif" className="text-sm">
+                    GIF
+                    <span className="ml-auto text-xs text-muted-foreground">Compatible</span>
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 p-3 sm:p-4 border-t border-border/50">
