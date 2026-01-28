@@ -60,6 +60,53 @@ async function searchTenor(query: string, limit: number = 20, pos?: string): Pro
   }
 }
 
+// Tenor featured/trending API
+async function getTenorFeatured(limit: number = 30, pos?: string): Promise<TenorSearchResult> {
+  const apiKey = process.env.TENOR_API_KEY
+  if (!apiKey) throw new Error('TENOR_API_KEY not configured')
+
+  const params = new URLSearchParams({
+    key: apiKey,
+    limit: limit.toString(),
+    media_filter: 'gif,mediumgif,tinygif,mp4,loopedmp4,webm',
+  })
+  
+  if (pos) {
+    params.set('pos', pos)
+  }
+
+  const response = await fetch(
+    `https://tenor.googleapis.com/v2/featured?${params}`
+  )
+
+  if (!response.ok) {
+    throw new Error('Tenor API request failed')
+  }
+
+  const data = await response.json()
+  return {
+    results: data.results || [],
+    next: data.next || '',
+  }
+}
+
+// Tenor trending search terms
+async function getTenorTrendingTerms(): Promise<string[]> {
+  const apiKey = process.env.TENOR_API_KEY
+  if (!apiKey) throw new Error('TENOR_API_KEY not configured')
+
+  const response = await fetch(
+    `https://tenor.googleapis.com/v2/trending_terms?key=${apiKey}&limit=20`
+  )
+
+  if (!response.ok) {
+    return []
+  }
+
+  const data = await response.json()
+  return data.results || []
+}
+
 // POST /api/admin/import/tenor - Import from Tenor (concurrent)
 export async function POST(request: NextRequest) {
   try {
@@ -194,8 +241,40 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('query')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const trending = searchParams.get('trending') === 'true'
+    const trendingTerms = searchParams.get('trending_terms') === 'true'
+    const limit = parseInt(searchParams.get('limit') || '30')
     const pos = searchParams.get('pos') || undefined
+
+    // Return trending search terms
+    if (trendingTerms) {
+      const terms = await getTenorTrendingTerms()
+      return NextResponse.json({ terms })
+    }
+
+    // Get trending/featured GIFs
+    if (trending) {
+      const { results, next } = await getTenorFeatured(limit, pos)
+      
+      const sourceIds = results.map(r => r.id)
+      const existingMap = await checkExistingBySourceId('TENOR', sourceIds)
+
+      return NextResponse.json({
+        results: results.map((r) => ({
+          id: r.id,
+          title: r.content_description || r.title || 'Trending GIF',
+          url: r.media_formats?.gif?.url || r.media_formats?.mediumgif?.url,
+          preview: r.media_formats?.tinygif?.url || r.media_formats?.mediumgif?.url,
+          mp4Preview: r.media_formats?.mp4?.url,
+          sourceUrl: r.url,
+          alreadyImported: existingMap.has(r.id),
+          tags: r.tags || [],
+        })),
+        totalCount: results.length,
+        hasNextPage: !!next,
+        nextPos: next || null,
+      })
+    }
 
     if (!query) {
       return NextResponse.json(
@@ -213,11 +292,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       results: results.map((r) => ({
         id: r.id,
-        title: r.content_description,
+        title: r.content_description || r.title || query,
         url: r.media_formats?.gif?.url || r.media_formats?.mediumgif?.url,
-        preview: r.media_formats?.tinygif?.url,
+        preview: r.media_formats?.tinygif?.url || r.media_formats?.mediumgif?.url,
+        mp4Preview: r.media_formats?.mp4?.url,
         sourceUrl: r.url,
         alreadyImported: existingMap.has(r.id),
+        tags: r.tags || [],
       })),
       totalCount: results.length,
       hasNextPage: !!next,

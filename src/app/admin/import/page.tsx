@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,9 +32,13 @@ import {
   Link as LinkIcon,
   TrendingUp,
   Zap,
-  Settings2,
   Trash2,
-  ExternalLink
+  Flame,
+  Sparkles,
+  Clock,
+  Play,
+  Hash,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -45,9 +49,10 @@ interface GifPreview {
   title: string
   url: string
   preview: string
+  mp4Preview?: string
   sourceUrl?: string
   alreadyImported?: boolean
-  selected?: boolean
+  tags?: string[]
 }
 
 interface ImportJob {
@@ -75,6 +80,18 @@ interface ImportStats {
   totalSkipped: number
 }
 
+// Popular search categories for quick access
+const QUICK_CATEGORIES = [
+  { label: 'Reactions', queries: ['reaction', 'mood', 'feeling', 'emotion'] },
+  { label: 'Memes', queries: ['meme', 'funny', 'lol', 'humor'] },
+  { label: 'Anime', queries: ['anime', 'manga', 'kawaii', 'otaku'] },
+  { label: 'Movies', queries: ['movie', 'cinema', 'film', 'scene'] },
+  { label: 'Celebs', queries: ['celebrity', 'famous', 'star', 'actor'] },
+  { label: 'Animals', queries: ['cat', 'dog', 'cute animals', 'pet'] },
+  { label: 'Sports', queries: ['sports', 'football', 'basketball', 'soccer'] },
+  { label: 'Gaming', queries: ['gaming', 'video game', 'gamer', 'esports'] },
+]
+
 export default function AdminImportPage() {
   const [activeTab, setActiveTab] = useState('tenor')
   const [searchQuery, setSearchQuery] = useState('')
@@ -86,28 +103,94 @@ export default function AdminImportPage() {
   const [isImportingUrl, setIsImportingUrl] = useState(false)
   const [isLoadingTrending, setIsLoadingTrending] = useState(false)
   const [previews, setPreviews] = useState<GifPreview[]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [selectMode, setSelectMode] = useState(false)
+  const [trendingTerms, setTrendingTerms] = useState<string[]>([])
+  const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [autoImport, setAutoImport] = useState(false)
   const [importStats, setImportStats] = useState<ImportStats>({ totalImported: 0, totalFailed: 0, totalSkipped: 0 })
   const [importJobs, setImportJobs] = useState<ImportJob[]>([])
   const [isLoadingJobs, setIsLoadingJobs] = useState(false)
+  const [showUrlImport, setShowUrlImport] = useState(false)
+  const [hoveredGif, setHoveredGif] = useState<string | null>(null)
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null)
   const [pagination, setPagination] = useState<PaginationInfo>({
     currentPage: 1,
     totalCount: 0,
     hasNextPage: false,
   })
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
-  const handleSearch = useCallback(async (resetPage: boolean = true, pos?: string) => {
-    if (!searchQuery.trim()) {
+  // Load trending terms on mount and tab change
+  useEffect(() => {
+    loadTrendingTerms()
+  }, [activeTab])
+
+  // Load recent searches from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('importRecentSearches')
+    if (saved) {
+      try {
+        setRecentSearches(JSON.parse(saved))
+      } catch {
+        // ignore
+      }
+    }
+  }, [])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K to focus search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
+      // Cmd/Ctrl + T to load trending
+      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
+        e.preventDefault()
+        handleLoadTrending()
+      }
+      // Cmd/Ctrl + Enter to import
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && previews.length > 0) {
+        e.preventDefault()
+        handleImport()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [previews])
+
+  const loadTrendingTerms = async () => {
+    try {
+      const response = await fetch(`/api/admin/import/${activeTab}?trending_terms=true`)
+      const data = await response.json()
+      if (data.terms) {
+        setTrendingTerms(data.terms.slice(0, 12))
+      }
+    } catch {
+      // Silently fail - trending terms are optional
+    }
+  }
+
+  const saveRecentSearch = (query: string) => {
+    const updated = [query, ...recentSearches.filter(q => q !== query)].slice(0, 8)
+    setRecentSearches(updated)
+    localStorage.setItem('importRecentSearches', JSON.stringify(updated))
+  }
+
+  const handleSearch = useCallback(async (query?: string, resetPage: boolean = true, pos?: string) => {
+    const searchTerm = query || searchQuery
+    if (!searchTerm.trim()) {
       toast.error('Please enter a search query')
       return
     }
 
-    setIsSearching(true)
-    setSelectedIds(new Set())
+    if (query) {
+      setSearchQuery(query)
+    }
+    saveRecentSearch(searchTerm)
     
-    // Reset on new search
+    setIsSearching(true)
+    
     const pageNum = resetPage ? 1 : pagination.currentPage + 1
     if (resetPage) {
       setPreviews([])
@@ -115,8 +198,8 @@ export default function AdminImportPage() {
 
     try {
       const params = new URLSearchParams({
-        query: searchQuery,
-        limit: '30',
+        query: searchTerm,
+        limit: '36',
       })
       if (pos) {
         params.set('pos', pos)
@@ -141,9 +224,8 @@ export default function AdminImportPage() {
       
       if (results.length === 0) {
         toast.info('No results found')
-      } else if (autoImport) {
-        // Auto-import if enabled
-        handleImportWithResults(results)
+      } else if (autoImport && results.some((r: GifPreview) => !r.alreadyImported)) {
+        handleImport(searchTerm)
       }
     } catch {
       toast.error('Search failed')
@@ -154,16 +236,12 @@ export default function AdminImportPage() {
 
   const handleLoadTrending = async () => {
     setIsLoadingTrending(true)
-    setSelectedIds(new Set())
     
     try {
-      // Tenor has a featured/trending endpoint
-      const params = new URLSearchParams({ limit: '30' })
-      
-      // For Tenor we can use a trending search
-      const trendingQueries = ['trending', 'popular', 'viral', 'reaction', 'meme']
-      const randomQuery = trendingQueries[Math.floor(Math.random() * trendingQueries.length)]
-      params.set('query', randomQuery)
+      const params = new URLSearchParams({ 
+        trending: 'true',
+        limit: '36',
+      })
       
       const response = await fetch(`/api/admin/import/${activeTab}?${params}`)
       const data = await response.json()
@@ -173,7 +251,7 @@ export default function AdminImportPage() {
         return
       }
 
-      setSearchQuery(randomQuery)
+      setSearchQuery('')
       setPreviews(data.results || [])
       setPagination({
         currentPage: 1,
@@ -182,12 +260,17 @@ export default function AdminImportPage() {
         nextPos: data.nextPos,
       })
       
-      toast.success(`Loaded ${data.results?.length || 0} trending GIFs`)
+      toast.success(`🔥 Loaded ${data.results?.length || 0} trending GIFs`)
     } catch {
       toast.error('Failed to load trending')
     } finally {
       setIsLoadingTrending(false)
     }
+  }
+
+  const handleQuickCategory = (category: typeof QUICK_CATEGORIES[0]) => {
+    const randomQuery = category.queries[Math.floor(Math.random() * category.queries.length)]
+    handleSearch(randomQuery)
   }
 
   const handleImportUrl = async () => {
@@ -198,66 +281,50 @@ export default function AdminImportPage() {
     }
 
     setIsImportingUrl(true)
-
-    try {
-      // Import each URL as a direct GIF
-      let imported = 0
-      let failed = 0
-      
-      for (const url of urls) {
-        try {
-          // Simple direct URL import via our upload API
-          const response = await fetch('/api/gifs', {
-            method: 'POST',
-            body: JSON.stringify({ 
-              url: url.trim(),
-              title: `Imported from URL`,
-              isPublic: true,
-            }),
-            headers: { 'Content-Type': 'application/json' },
-          })
-          
-          if (response.ok) {
-            imported++
-          } else {
-            failed++
-          }
-        } catch {
+    let imported = 0
+    let failed = 0
+    
+    for (let i = 0; i < urls.length; i++) {
+      setImportProgress({ current: i + 1, total: urls.length })
+      try {
+        const response = await fetch('/api/gifs', {
+          method: 'POST',
+          body: JSON.stringify({ 
+            url: urls[i].trim(),
+            title: `Imported from URL`,
+            isPublic: true,
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        })
+        
+        if (response.ok) {
+          imported++
+        } else {
           failed++
         }
+      } catch {
+        failed++
       }
-      
-      setImportStats(prev => ({
-        totalImported: prev.totalImported + imported,
-        totalFailed: prev.totalFailed + failed,
-        totalSkipped: prev.totalSkipped,
-      }))
-      
-      toast.success(`Imported ${imported} URLs (${failed} failed)`)
-      setUrlInput('')
-      loadImportJobs()
-    } catch {
-      toast.error('URL import failed')
-    } finally {
-      setIsImportingUrl(false)
-    }
-  }
-
-  const handleImportWithResults = async (results: GifPreview[]) => {
-    // Filter out already imported
-    const toImport = results.filter(r => !r.alreadyImported)
-    if (toImport.length === 0) {
-      toast.info('All GIFs already imported')
-      return
     }
     
-    // This triggers the normal import flow
-    handleImport()
+    setImportProgress(null)
+    setImportStats(prev => ({
+      totalImported: prev.totalImported + imported,
+      totalFailed: prev.totalFailed + failed,
+      totalSkipped: prev.totalSkipped,
+    }))
+    
+    toast.success(`✅ Imported ${imported} URLs (${failed} failed)`)
+    setUrlInput('')
+    setShowUrlImport(false)
+    loadImportJobs()
+    setIsImportingUrl(false)
   }
 
-  const handleImport = async () => {
-    if (!searchQuery.trim()) {
-      toast.error('Please enter a search query')
+  const handleImport = async (query?: string) => {
+    const searchTerm = query || searchQuery
+    if (!searchTerm.trim() && previews.length === 0) {
+      toast.error('Please search for GIFs first')
       return
     }
 
@@ -268,8 +335,8 @@ export default function AdminImportPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          query: searchQuery, 
-          limit: 30,
+          query: searchTerm || 'trending', 
+          limit: 36,
         }),
       })
       
@@ -286,12 +353,14 @@ export default function AdminImportPage() {
         totalSkipped: prev.totalSkipped + (data.skipped || 0),
       }))
 
-      toast.success(`Imported ${data.imported} GIFs (${data.skipped || 0} skipped, ${data.failed} failed)`)
+      toast.success(`⚡ Imported ${data.imported} GIFs (${data.skipped || 0} skipped)`)
       loadImportJobs()
       
-      // Refresh previews to show updated import status
-      if (searchQuery.trim()) {
-        handleSearch(true)
+      // Refresh previews
+      if (searchTerm.trim()) {
+        handleSearch(searchTerm, true)
+      } else {
+        handleLoadTrending()
       }
     } catch {
       toast.error('Import failed')
@@ -301,17 +370,13 @@ export default function AdminImportPage() {
   }
 
   const handleImportMultiplePages = async () => {
-    if (!searchQuery.trim()) {
+    const searchTerm = searchQuery
+    if (!searchTerm.trim()) {
       toast.error('Please enter a search query')
       return
     }
 
     const pagesToImport = parseInt(maxPages) || 5
-    if (pagesToImport < 1 || pagesToImport > 50) {
-      toast.error('Please enter a number between 1 and 50')
-      return
-    }
-
     setIsImportingMultiple(true)
     let totalImported = 0
     let totalFailed = 0
@@ -321,11 +386,13 @@ export default function AdminImportPage() {
 
     try {
       while (pageCount < pagesToImport) {
+        setImportProgress({ current: pageCount + 1, total: pagesToImport })
+        
         const response = await fetch(`/api/admin/import/${activeTab}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            query: searchQuery, 
+            query: searchTerm, 
             limit: 50,
             pos: currentPos 
           }),
@@ -343,55 +410,30 @@ export default function AdminImportPage() {
         totalSkipped += data.skipped || 0
         pageCount++
 
-        toast.info(`Page ${pageCount}/${pagesToImport}: +${data.imported} imported${data.skipped > 0 ? `, ${data.skipped} skipped` : ''}`)
-
-        // Check if there are more pages
         if (!data.hasNextPage || !data.nextPos) {
-          toast.info('No more pages available')
           break
         }
         currentPos = data.nextPos
         
-        // Small delay between pages to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await new Promise(resolve => setTimeout(resolve, 300))
       }
 
+      setImportProgress(null)
       setImportStats(prev => ({
         totalImported: prev.totalImported + totalImported,
         totalFailed: prev.totalFailed + totalFailed,
         totalSkipped: prev.totalSkipped + totalSkipped,
       }))
 
-      toast.success(`Total: ${totalImported} imported, ${totalSkipped} skipped, ${totalFailed} failed from ${pageCount} pages`)
+      toast.success(`🚀 ${totalImported} imported from ${pageCount} pages!`)
       loadImportJobs()
-      
-      // Refresh previews
-      if (searchQuery.trim()) {
-        handleSearch(true)
-      }
+      handleSearch(searchTerm, true)
     } catch {
       toast.error('Import failed')
     } finally {
+      setImportProgress(null)
       setIsImportingMultiple(false)
     }
-  }
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === previews.filter(p => !p.alreadyImported).length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(previews.filter(p => !p.alreadyImported).map(p => p.id)))
-    }
-  }
-
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selectedIds)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelectedIds(newSelected)
   }
 
   const clearStats = () => {
@@ -411,326 +453,399 @@ export default function AdminImportPage() {
     }
   }
 
-  // Load jobs on mount
   useEffect(() => {
     loadImportJobs()
   }, [])
 
   const loadNextPage = () => {
     if (pagination.hasNextPage && pagination.nextPos) {
-      handleSearch(false, pagination.nextPos)
+      handleSearch(searchQuery, false, pagination.nextPos)
     }
   }
 
-  const getSourceLabel = (source: string) => {
-    switch (source) {
-      case 'tenor': return 'Tenor'
-      case 'giphy': return 'Giphy'
-      case 'klipy': return 'Klipy'
-      default: return source
+  const getSourceIcon = (source: string) => {
+    switch (source.toLowerCase()) {
+      case 'tenor': return '🎬'
+      case 'giphy': return '✨'
+      case 'klipy': return '🎯'
+      default: return '📦'
     }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'COMPLETED': return 'bg-green-500/10 text-green-500'
-      case 'PROCESSING': return 'bg-yellow-500/10 text-yellow-500'
-      case 'FAILED': return 'bg-red-500/10 text-red-500'
+      case 'COMPLETED': return 'bg-green-500/10 text-green-500 border-green-500/20'
+      case 'PROCESSING': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+      case 'FAILED': return 'bg-red-500/10 text-red-500 border-red-500/20'
       default: return 'bg-muted text-muted-foreground'
     }
   }
 
+  const newCount = previews.filter(p => !p.alreadyImported).length
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-4 sm:py-8 px-3 sm:px-4">
-        {/* Header with Stats */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+      <div className="container mx-auto py-4 sm:py-6 px-3 sm:px-4 max-w-7xl">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Import GIFs</h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">
-              Import GIFs from Tenor, Giphy, Klipy, or URLs
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+              <Sparkles className="h-7 w-7 text-primary" />
+              Import GIFs
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+              <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">⌘K</kbd> search
+              <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">⌘T</kbd> trending
+              <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">⌘↵</kbd> import
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Link href="/admin">
-              <Button variant="outline" size="sm">
-                Back to Admin
-              </Button>
+              <Button variant="outline" size="sm">← Admin</Button>
             </Link>
           </div>
         </div>
 
-        {/* Session Stats Bar */}
-        {(importStats.totalImported > 0 || importStats.totalFailed > 0 || importStats.totalSkipped > 0) && (
-          <Card className="mb-6 border-border/50 bg-card/50">
-            <CardContent className="py-3 px-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-muted-foreground">Session:</span>
-                  <span className="flex items-center gap-1.5">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="font-medium">{importStats.totalImported}</span> imported
+        {/* Stats Bar */}
+        {(importStats.totalImported > 0 || importProgress) && (
+          <div className="mb-6 p-3 rounded-xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-pink-500/10 border border-primary/20">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {importProgress ? (
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <span className="font-medium">
+                    Importing page {importProgress.current} of {importProgress.total}...
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <XCircle className="h-4 w-4 text-yellow-500" />
-                    <span className="font-medium">{importStats.totalSkipped}</span> skipped
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <XCircle className="h-4 w-4 text-red-500" />
-                    <span className="font-medium">{importStats.totalFailed}</span> failed
-                  </span>
-                </div>
-                <Button variant="ghost" size="sm" onClick={clearStats} className="h-7 text-xs">
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  Clear Stats
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid gap-6 lg:gap-8 lg:grid-cols-3">
-          {/* Main content */}
-          <div className="lg:col-span-2 order-1 space-y-6">
-            {/* Search Import Card */}
-            <Card className="border-border/50">
-              <CardHeader className="px-4 sm:px-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                      <Search className="h-5 w-5" />
-                      Search & Import
-                    </CardTitle>
-                    <CardDescription className="text-sm">
-                      Search GIF providers and bulk import
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="auto-import" className="text-xs text-muted-foreground cursor-pointer">
-                      Auto-import
-                    </Label>
-                    <Switch
-                      id="auto-import"
-                      checked={autoImport}
-                      onCheckedChange={setAutoImport}
+                  <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all duration-300"
+                      style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
                     />
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="px-4 sm:px-6">
+              ) : (
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    {importStats.totalImported} imported
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-yellow-500" />
+                    {importStats.totalSkipped} skipped
+                  </span>
+                  {importStats.totalFailed > 0 && (
+                    <span className="flex items-center gap-1.5 text-red-500">
+                      <XCircle className="h-4 w-4" />
+                      {importStats.totalFailed} failed
+                    </span>
+                  )}
+                </div>
+              )}
+              {!importProgress && (
+                <Button variant="ghost" size="sm" onClick={clearStats} className="h-7 text-xs">
+                  <Trash2 className="h-3 w-3 mr-1" /> Clear
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-4">
+          {/* Main Content */}
+          <div className="lg:col-span-3 space-y-4">
+            {/* Source Tabs + Search */}
+            <Card className="border-border/50 overflow-hidden">
+              <div className="p-4 space-y-4">
+                {/* Source Tabs */}
                 <Tabs value={activeTab} onValueChange={(tab) => {
                   setActiveTab(tab)
                   setPreviews([])
                   setSearchQuery('')
-                  setSelectedIds(new Set())
                   setPagination({ currentPage: 1, totalCount: 0, hasNextPage: false })
                 }}>
-                  <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6 h-auto">
-                    <TabsTrigger value="tenor" className="text-xs sm:text-sm py-2 sm:py-1.5">Tenor</TabsTrigger>
-                    <TabsTrigger value="giphy" className="text-xs sm:text-sm py-2 sm:py-1.5">Giphy</TabsTrigger>
-                    <TabsTrigger value="klipy" className="text-xs sm:text-sm py-2 sm:py-1.5">Klipy</TabsTrigger>
-                  </TabsList>
-
-                  <div className="space-y-4">
-                    {/* Search controls */}
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <div className="flex-1">
-                        <Label htmlFor="search" className="sr-only">Search</Label>
-                        <Input
-                          id="search"
-                          placeholder={`Search ${getSourceLabel(activeTab)} for GIFs...`}
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSearch(true)}
-                          className="bg-background/50 h-10 sm:h-9"
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <TabsList className="h-9">
+                      <TabsTrigger value="tenor" className="text-sm px-4">🎬 Tenor</TabsTrigger>
+                      <TabsTrigger value="giphy" className="text-sm px-4">✨ Giphy</TabsTrigger>
+                      <TabsTrigger value="klipy" className="text-sm px-4">🎯 Klipy</TabsTrigger>
+                    </TabsList>
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="auto-import"
+                          checked={autoImport}
+                          onCheckedChange={setAutoImport}
                         />
+                        <Label htmlFor="auto-import" className="text-xs text-muted-foreground cursor-pointer">
+                          Auto-import
+                        </Label>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => handleSearch(true)}
-                          disabled={isSearching}
-                          className="flex-1 sm:flex-none h-10 sm:h-9"
-                        >
-                          {isSearching ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Search className="h-4 w-4" />
-                          )}
-                          <span className="ml-2">Search</span>
-                        </Button>
-                        <Button
-                          onClick={handleLoadTrending}
-                          disabled={isLoadingTrending || isSearching}
-                          variant="outline"
-                          className="h-10 sm:h-9"
-                          title="Load trending GIFs"
-                        >
-                          {isLoadingTrending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <TrendingUp className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowUrlImport(!showUrlImport)}
+                        className="h-8"
+                      >
+                        <LinkIcon className="h-3.5 w-3.5 mr-1.5" />
+                        URL
+                      </Button>
                     </div>
-
-                    {/* Import controls */}
-                    {previews.length > 0 && (
-                      <div className="space-y-3">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Button
-                            onClick={handleImport}
-                            disabled={isImporting || isImportingMultiple || !searchQuery.trim()}
-                            variant="default"
-                            className="flex-1 sm:flex-none h-10 sm:h-9 bg-primary"
-                          >
-                            {isImporting ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Zap className="h-4 w-4" />
-                            )}
-                            <span className="ml-2">Import Page ({previews.filter(p => !p.alreadyImported).length})</span>
-                          </Button>
-                        </div>
-                        
-                        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                          <div className="flex-1 flex gap-2 w-full sm:w-auto">
-                            <div className="flex-1 sm:flex-none sm:w-28">
-                              <Label htmlFor="maxPages" className="sr-only">Max Pages</Label>
-                              <Select value={maxPages} onValueChange={setMaxPages}>
-                                <SelectTrigger className="h-10 sm:h-9">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="1">1 page</SelectItem>
-                                  <SelectItem value="2">2 pages</SelectItem>
-                                  <SelectItem value="3">3 pages</SelectItem>
-                                  <SelectItem value="5">5 pages</SelectItem>
-                                  <SelectItem value="10">10 pages</SelectItem>
-                                  <SelectItem value="20">20 pages</SelectItem>
-                                  <SelectItem value="30">30 pages</SelectItem>
-                                  <SelectItem value="50">50 pages</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <Button
-                              onClick={handleImportMultiplePages}
-                              disabled={isImporting || isImportingMultiple || !searchQuery.trim()}
-                              variant="secondary"
-                              className="flex-1 sm:flex-none h-10 sm:h-9"
-                            >
-                              {isImportingMultiple ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <ChevronsRight className="h-4 w-4" />
-                              )}
-                              <span className="ml-2">Bulk Import</span>
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Results info */}
-                    {previews.length > 0 && (
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm text-muted-foreground">
-                        <span>
-                          Showing {previews.length} results ({previews.filter(p => p.alreadyImported).length} already imported)
-                        </span>
-                        <span>Page {pagination.currentPage}</span>
-                      </div>
-                    )}
-
-                    <TabsContent value="tenor" className="mt-0">
-                      <GifGrid previews={previews} isLoading={isSearching} selectMode={selectMode} selectedIds={selectedIds} onToggleSelect={toggleSelect} />
-                    </TabsContent>
-                    <TabsContent value="giphy" className="mt-0">
-                      <GifGrid previews={previews} isLoading={isSearching} selectMode={selectMode} selectedIds={selectedIds} onToggleSelect={toggleSelect} />
-                    </TabsContent>
-                    <TabsContent value="klipy" className="mt-0">
-                      <GifGrid previews={previews} isLoading={isSearching} selectMode={selectMode} selectedIds={selectedIds} onToggleSelect={toggleSelect} />
-                    </TabsContent>
-
-                    {/* Pagination controls */}
-                    {pagination.hasNextPage && (
-                      <div className="flex items-center justify-center gap-2 pt-4">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleSearch(true)}
-                          disabled={isSearching}
-                          className="h-9"
-                        >
-                          <ChevronsLeft className="h-4 w-4 mr-2" />
-                          Back to First
-                        </Button>
-                        <span className="px-3 py-2 text-sm font-medium">
-                          Page {pagination.currentPage}
-                        </span>
-                        <Button
-                          variant="outline"
-                          onClick={loadNextPage}
-                          disabled={!pagination.hasNextPage || isSearching}
-                          className="h-9"
-                        >
-                          Next Page
-                          <ChevronRight className="h-4 w-4 ml-2" />
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 </Tabs>
-              </CardContent>
-            </Card>
 
-            {/* URL Import Card */}
-            <Card className="border-border/50">
-              <CardHeader className="px-4 sm:px-6">
-                <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                  <LinkIcon className="h-5 w-5" />
-                  Import from URLs
-                </CardTitle>
-                <CardDescription className="text-sm">
-                  Paste direct GIF/MP4 URLs to import (one per line)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="px-4 sm:px-6">
-                <div className="space-y-3">
-                  <Textarea
-                    placeholder="https://example.com/image.gif&#10;https://example.com/video.mp4&#10;..."
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    rows={4}
-                    className="bg-background/50 font-mono text-sm"
-                  />
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">
-                      {urlInput.trim().split('\n').filter(u => u.trim()).length} URL(s)
-                    </span>
-                    <Button
-                      onClick={handleImportUrl}
-                      disabled={isImportingUrl || !urlInput.trim()}
-                      size="sm"
-                    >
-                      {isImportingUrl ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Download className="h-4 w-4 mr-2" />
-                      )}
-                      Import URLs
-                    </Button>
+                {/* URL Import Dropdown */}
+                {showUrlImport && (
+                  <div className="p-4 bg-muted/50 rounded-lg border border-border/50 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Import from URLs</Label>
+                      <Button variant="ghost" size="sm" onClick={() => setShowUrlImport(false)} className="h-7 w-7 p-0">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Textarea
+                      placeholder="Paste GIF/MP4 URLs (one per line)..."
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      rows={3}
+                      className="font-mono text-sm"
+                    />
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        {urlInput.trim().split('\n').filter(u => u.trim()).length} URLs
+                      </span>
+                      <Button onClick={handleImportUrl} disabled={isImportingUrl || !urlInput.trim()} size="sm">
+                        {isImportingUrl ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+                        Import URLs
+                      </Button>
+                    </div>
                   </div>
+                )}
+
+                {/* Search Bar */}
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      ref={searchInputRef}
+                      placeholder="Search GIFs..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      className="pl-10 h-11 text-base"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => handleSearch()}
+                    disabled={isSearching}
+                    className="h-11 px-6"
+                  >
+                    {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
+                  </Button>
+                  <Button
+                    onClick={handleLoadTrending}
+                    disabled={isLoadingTrending}
+                    variant="outline"
+                    className="h-11"
+                    title="Load Trending"
+                  >
+                    {isLoadingTrending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flame className="h-4 w-4 text-orange-500" />}
+                  </Button>
                 </div>
-              </CardContent>
+
+                {/* Quick Categories */}
+                <div className="flex flex-wrap gap-2">
+                  {QUICK_CATEGORIES.map((cat) => (
+                    <Button
+                      key={cat.label}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleQuickCategory(cat)}
+                      className="h-7 text-xs"
+                    >
+                      {cat.label}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Trending Terms */}
+                {trendingTerms.length > 0 && !previews.length && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      <span>Trending searches</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {trendingTerms.map((term) => (
+                        <Badge
+                          key={term}
+                          variant="secondary"
+                          className="cursor-pointer hover:bg-primary/20 transition-colors"
+                          onClick={() => handleSearch(term)}
+                        >
+                          {term}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Searches */}
+                {recentSearches.length > 0 && !previews.length && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>Recent searches</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {recentSearches.map((term) => (
+                        <Badge
+                          key={term}
+                          variant="outline"
+                          className="cursor-pointer hover:bg-muted transition-colors"
+                          onClick={() => handleSearch(term)}
+                        >
+                          {term}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Results */}
+              {(previews.length > 0 || isSearching) && (
+                <div className="border-t border-border/50">
+                  {/* Import Actions Bar */}
+                  {previews.length > 0 && (
+                    <div className="p-3 bg-muted/30 border-b border-border/50 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="text-muted-foreground">
+                          {previews.length} results
+                        </span>
+                        {newCount > 0 && (
+                          <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20">
+                            {newCount} new
+                          </Badge>
+                        )}
+                        {previews.length - newCount > 0 && (
+                          <Badge variant="secondary">
+                            {previews.length - newCount} imported
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => handleImport()}
+                          disabled={isImporting || newCount === 0}
+                          size="sm"
+                          className="bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90"
+                        >
+                          {isImporting ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Zap className="h-4 w-4 mr-2" />
+                          )}
+                          Import {newCount}
+                        </Button>
+                        
+                        <div className="flex items-center gap-1.5">
+                          <Select value={maxPages} onValueChange={setMaxPages}>
+                            <SelectTrigger className="h-8 w-20 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[1, 2, 3, 5, 10, 20, 30, 50].map(n => (
+                                <SelectItem key={n} value={n.toString()}>{n} pg</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            onClick={handleImportMultiplePages}
+                            disabled={isImportingMultiple || !searchQuery.trim()}
+                            variant="secondary"
+                            size="sm"
+                          >
+                            {isImportingMultiple ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            ) : (
+                              <ChevronsRight className="h-4 w-4 mr-1" />
+                            )}
+                            Bulk
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Grid */}
+                  <div className="p-3">
+                    <GifGrid 
+                      previews={previews} 
+                      isLoading={isSearching} 
+                      hoveredGif={hoveredGif}
+                      setHoveredGif={setHoveredGif}
+                    />
+                  </div>
+
+                  {/* Pagination */}
+                  {pagination.hasNextPage && (
+                    <div className="p-3 border-t border-border/50 flex items-center justify-center gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleSearch(searchQuery, true)}
+                        disabled={isSearching}
+                        size="sm"
+                      >
+                        <ChevronsLeft className="h-4 w-4 mr-1" />
+                        First
+                      </Button>
+                      <span className="px-3 text-sm text-muted-foreground">
+                        Page {pagination.currentPage}
+                      </span>
+                      <Button
+                        variant="outline"
+                        onClick={loadNextPage}
+                        disabled={!pagination.hasNextPage || isSearching}
+                        size="sm"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Empty State */}
+              {!previews.length && !isSearching && (
+                <div className="p-12 text-center border-t border-border/50">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">Search or load trending</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Find GIFs from {activeTab === 'tenor' ? 'Tenor' : activeTab === 'giphy' ? 'Giphy' : 'Klipy'} to import
+                  </p>
+                  <Button onClick={handleLoadTrending} disabled={isLoadingTrending}>
+                    {isLoadingTrending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Flame className="h-4 w-4 mr-2" />}
+                    Load Trending
+                  </Button>
+                </div>
+              )}
             </Card>
           </div>
 
-          {/* Sidebar - Recent Imports */}
-          <div className="order-2">
+          {/* Sidebar */}
+          <div className="space-y-4">
+            {/* Recent Imports */}
             <Card className="border-border/50">
-              <CardHeader className="px-4 sm:px-6">
+              <CardHeader className="p-4 pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                    <History className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <History className="h-4 w-4" />
                     Recent Imports
                   </CardTitle>
                   <Button
@@ -738,50 +853,39 @@ export default function AdminImportPage() {
                     size="sm"
                     onClick={loadImportJobs}
                     disabled={isLoadingJobs}
-                    className="h-8 px-2 sm:px-3"
+                    className="h-7 w-7 p-0"
                   >
-                    {isLoadingJobs ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    <span className="ml-1.5 hidden sm:inline">Refresh</span>
+                    {isLoadingJobs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="px-4 sm:px-6">
-                <div className="space-y-3">
+              <CardContent className="p-4 pt-2">
+                <div className="space-y-2">
                   {isLoadingJobs ? (
                     Array.from({ length: 3 }).map((_, i) => (
-                      <Skeleton key={i} className="h-20 w-full" />
+                      <Skeleton key={i} className="h-16 w-full rounded-lg" />
                     ))
                   ) : importJobs.length === 0 ? (
-                    <p className="text-muted-foreground text-sm text-center py-4">
-                      No import jobs yet
+                    <p className="text-muted-foreground text-xs text-center py-4">
+                      No imports yet
                     </p>
                   ) : (
-                    importJobs.map((job) => (
+                    importJobs.slice(0, 6).map((job) => (
                       <div
                         key={job.id}
-                        className="p-3 rounded-lg border border-border/50 bg-card/50"
+                        className="p-2.5 rounded-lg border border-border/50 bg-card/50 space-y-1.5"
                       >
-                        <div className="flex items-center justify-between mb-2 gap-2">
-                          <Badge variant="outline" className="text-xs">{job.source}</Badge>
-                          <Badge className={`text-xs ${getStatusColor(job.status)}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs">{getSourceIcon(job.source)}</span>
+                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getStatusColor(job.status)}`}>
                             {job.status}
                           </Badge>
                         </div>
-                        <p className="text-sm font-medium truncate">{job.query}</p>
-                        <div className="flex items-center gap-3 sm:gap-4 mt-2 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3 text-green-500" />
-                            {job.importedItems}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <XCircle className="h-3 w-3 text-red-500" />
-                            {job.failedItems}
-                          </span>
-                          <span>/ {job.totalItems}</span>
+                        <p className="text-xs font-medium truncate">{job.query}</p>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                          <span className="text-green-500">✓{job.importedItems}</span>
+                          <span className="text-red-500">✗{job.failedItems}</span>
+                          <span>/{job.totalItems}</span>
                         </div>
                       </div>
                     ))
@@ -799,78 +903,81 @@ export default function AdminImportPage() {
 interface GifGridProps {
   previews: GifPreview[]
   isLoading: boolean
-  selectMode?: boolean
-  selectedIds?: Set<string>
-  onToggleSelect?: (id: string) => void
+  hoveredGif: string | null
+  setHoveredGif: (id: string | null) => void
 }
 
-function GifGrid({ previews, isLoading, selectMode, selectedIds, onToggleSelect }: GifGridProps) {
+function GifGrid({ previews, isLoading, hoveredGif, setHoveredGif }: GifGridProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
-        {Array.from({ length: 10 }).map((_, i) => (
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+        {Array.from({ length: 18 }).map((_, i) => (
           <Skeleton key={i} className="aspect-square rounded-lg" />
         ))}
       </div>
     )
   }
 
-  if (previews.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-muted-foreground">
-        <ImageIcon className="h-10 w-10 sm:h-12 sm:w-12 mb-4 opacity-50" />
-        <p className="text-sm sm:text-base text-center px-4">Search for GIFs to preview them here</p>
-      </div>
-    )
-  }
-
-  const alreadyImportedCount = previews.filter(p => p.alreadyImported).length
-
   return (
-    <div className="space-y-3">
-      {alreadyImportedCount > 0 && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-2">
-          <CheckCircle className="h-4 w-4 text-green-500" />
-          <span>{alreadyImportedCount} of {previews.length} already imported</span>
-        </div>
-      )}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
-        {previews.map((gif) => (
-          <div
-            key={gif.id}
-            onClick={() => selectMode && onToggleSelect?.(gif.id)}
-            className={`relative aspect-square rounded-lg overflow-hidden border bg-muted group cursor-pointer transition-all ${
-              gif.alreadyImported 
-                ? 'border-green-500/50 opacity-60' 
-                : selectMode && selectedIds?.has(gif.id)
-                  ? 'border-primary ring-2 ring-primary/50'
-                  : 'border-border/50 hover:border-border'
-            }`}
-          >
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+      {previews.map((gif) => (
+        <div
+          key={gif.id}
+          className={`relative aspect-square rounded-lg overflow-hidden border bg-muted group cursor-pointer transition-all duration-200 ${
+            gif.alreadyImported 
+              ? 'border-green-500/50 opacity-50 grayscale hover:opacity-70 hover:grayscale-0' 
+              : 'border-border/50 hover:border-primary/50 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10'
+          }`}
+          onMouseEnter={() => setHoveredGif(gif.id)}
+          onMouseLeave={() => setHoveredGif(null)}
+        >
+          {/* Show MP4 on hover if available */}
+          {hoveredGif === gif.id && gif.mp4Preview ? (
+            <video
+              src={gif.mp4Preview}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
             <Image
               src={gif.preview || gif.url}
-              alt={gif.title || 'Animated GIF preview'}
+              alt={gif.title || 'GIF preview'}
               fill
               className="object-cover"
-              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+              sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 16vw"
               unoptimized
             />
-            {gif.alreadyImported && (
-              <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
-                <CheckCircle className="h-3 w-3 text-white" />
-              </div>
-            )}
-            {selectMode && selectedIds?.has(gif.id) && !gif.alreadyImported && (
-              <div className="absolute top-2 right-2 bg-primary rounded-full p-1">
-                <CheckCircle className="h-3 w-3 text-white" />
-              </div>
-            )}
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 sm:transition-opacity flex items-end p-2">
-              <p className="text-xs text-white truncate">{gif.title}</p>
+          )}
+          
+          {/* Imported Badge */}
+          {gif.alreadyImported && (
+            <div className="absolute top-1.5 right-1.5 bg-green-500 rounded-full p-0.5">
+              <CheckCircle className="h-3 w-3 text-white" />
             </div>
+          )}
+          
+          {/* Hover Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
+            <p className="text-[10px] text-white line-clamp-2 leading-tight">{gif.title}</p>
+            {gif.tags && gif.tags.length > 0 && (
+              <div className="flex items-center gap-1 mt-1 overflow-hidden">
+                <Hash className="h-2.5 w-2.5 text-white/60 shrink-0" />
+                <span className="text-[9px] text-white/60 truncate">{gif.tags.slice(0, 2).join(', ')}</span>
+              </div>
+            )}
           </div>
-        ))}
-      </div>
+          
+          {/* Play indicator for videos */}
+          {gif.mp4Preview && hoveredGif !== gif.id && (
+            <div className="absolute bottom-1.5 right-1.5 bg-black/60 rounded-full p-1">
+              <Play className="h-2.5 w-2.5 text-white fill-white" />
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

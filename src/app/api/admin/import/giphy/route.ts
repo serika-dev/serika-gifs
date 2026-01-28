@@ -31,7 +31,7 @@ async function searchGiphy(query: string, limit: number = 20, offset: number = 0
   if (!apiKey) throw new Error('GIPHY_API_KEY not configured')
 
   const response = await fetch(
-    `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&rating=g`
+    `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&rating=r`
   )
 
   if (!response.ok) {
@@ -44,6 +44,44 @@ async function searchGiphy(query: string, limit: number = 20, offset: number = 0
     totalCount: data.pagination?.total_count || 0,
     offset: data.pagination?.offset || 0,
   }
+}
+
+// Giphy trending API
+async function getGiphyTrending(limit: number = 30, offset: number = 0): Promise<GiphySearchResult> {
+  const apiKey = process.env.GIPHY_API_KEY
+  if (!apiKey) throw new Error('GIPHY_API_KEY not configured')
+
+  const response = await fetch(
+    `https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=${limit}&offset=${offset}&rating=r`
+  )
+
+  if (!response.ok) {
+    throw new Error('Giphy API request failed')
+  }
+
+  const data = await response.json()
+  return {
+    results: data.data || [],
+    totalCount: data.pagination?.total_count || 0,
+    offset: data.pagination?.offset || 0,
+  }
+}
+
+// Giphy trending search terms
+async function getGiphyTrendingTerms(): Promise<string[]> {
+  const apiKey = process.env.GIPHY_API_KEY
+  if (!apiKey) throw new Error('GIPHY_API_KEY not configured')
+
+  const response = await fetch(
+    `https://api.giphy.com/v1/trending/searches?api_key=${apiKey}`
+  )
+
+  if (!response.ok) {
+    return []
+  }
+
+  const data = await response.json()
+  return data.data || []
 }
 
 // POST /api/admin/import/giphy - Import from Giphy (concurrent)
@@ -186,9 +224,43 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('query')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const trending = searchParams.get('trending') === 'true'
+    const trendingTerms = searchParams.get('trending_terms') === 'true'
+    const limit = parseInt(searchParams.get('limit') || '30')
     const pos = searchParams.get('pos')
     const offset = pos ? parseInt(pos) : 0
+
+    // Return trending search terms
+    if (trendingTerms) {
+      const terms = await getGiphyTrendingTerms()
+      return NextResponse.json({ terms })
+    }
+
+    // Get trending GIFs
+    if (trending) {
+      const { results, totalCount } = await getGiphyTrending(limit, offset)
+      
+      const sourceIds = results.map(r => r.id)
+      const existingMap = await checkExistingBySourceId('GIPHY', sourceIds)
+
+      const nextOffset = offset + limit
+      const hasNextPage = nextOffset < totalCount
+
+      return NextResponse.json({
+        results: results.map((r) => ({
+          id: r.id,
+          title: r.title || 'Trending GIF',
+          url: r.images?.original?.url,
+          preview: r.images?.fixed_height_small?.url,
+          mp4Preview: r.images?.original_mp4?.mp4 || r.images?.original?.mp4,
+          sourceUrl: r.url,
+          alreadyImported: existingMap.has(r.id),
+        })),
+        totalCount,
+        hasNextPage,
+        nextPos: hasNextPage ? nextOffset.toString() : null,
+      })
+    }
 
     if (!query) {
       return NextResponse.json(
@@ -209,9 +281,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       results: results.map((r) => ({
         id: r.id,
-        title: r.title,
+        title: r.title || query,
         url: r.images?.original?.url,
         preview: r.images?.fixed_height_small?.url,
+        mp4Preview: r.images?.original_mp4?.mp4 || r.images?.original?.mp4,
         sourceUrl: r.url,
         alreadyImported: existingMap.has(r.id),
       })),
