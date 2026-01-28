@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { uploadToB2 } from '@/lib/storage'
+import { generateAndUploadThumbnail } from '@/lib/thumbnail'
 import { nanoid } from 'nanoid'
 import imageSize from 'image-size'
 
@@ -183,6 +184,17 @@ export async function POST(request: NextRequest) {
     // Upload to B2
     const url = await uploadToB2(buffer, key, file.type)
 
+    // Generate static thumbnail for GIFs
+    let thumbnailUrl: string | null = null
+    if (file.type === 'image/gif') {
+      try {
+        thumbnailUrl = await generateAndUploadThumbnail(buffer, session.id, slug)
+      } catch (e) {
+        console.error('Error generating thumbnail:', e)
+        // Continue without thumbnail
+      }
+    }
+
     // Create GIF record
     const gif = await prisma.gif.create({
       data: {
@@ -190,6 +202,7 @@ export async function POST(request: NextRequest) {
         title,
         description: description || null,
         url,
+        thumbnailUrl,
         width,
         height,
         fileSize: file.size,

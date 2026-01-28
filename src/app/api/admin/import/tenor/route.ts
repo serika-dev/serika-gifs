@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/session'
-import { uploadToB2 } from '@/lib/storage'
-import { nanoid } from 'nanoid'
+import {
+  importGifsBatch,
+  GifToImport,
+  checkExistingBySourceId,
+} from '@/lib/import-utils'
 
 interface TenorSearchResult {
   results: TenorGif[]
@@ -51,12 +54,12 @@ async function searchTenor(query: string, limit: number = 20, pos?: string): Pro
   }
 }
 
-// POST /api/admin/import/tenor - Import from Tenor
+// POST /api/admin/import/tenor - Import from Tenor (concurrent)
 export async function POST(request: NextRequest) {
   try {
     const admin = await requireAdmin()
 
-    const { query, limit = 20, pos } = await request.json()
+    const { query, limit = 50, pos, concurrency = 5 } = await request.json()
 
     if (!query) {
       return NextResponse.json(
@@ -82,114 +85,42 @@ export async function POST(request: NextRequest) {
         data: { totalItems: results.length },
       })
 
-      let imported = 0
-      let failed = 0
+      // Pre-check for existing GIFs to show skipped count
+      const sourceIds = results.map(r => r.id)
+      const existingMap = await checkExistingBySourceId('TENOR', sourceIds)
 
-      for (const result of results) {
-        try {
-          // Check if already imported
-          const existing = await prisma.gif.findFirst({
-            where: {
-              source: 'TENOR',
-              sourceId: result.id,
-            },
-          })
-
-          if (existing) {
-            continue
-          }
-
+      // Transform to common format
+      const gifsToImport: GifToImport[] = results
+        .filter(result => {
           const gifUrl = result.media_formats?.gif?.url || result.media_formats?.mediumgif?.url
-
-          if (!gifUrl) {
-            failed++
-            continue
-          }
-
-          const previewUrl = result.media_formats?.tinygif?.url
-
-          // Download and re-upload to B2
-          const gifResponse = await fetch(gifUrl)
-          const gifBuffer = Buffer.from(await gifResponse.arrayBuffer())
-          
-          const slug = nanoid(10)
-          const key = `gifs/imports/tenor/${slug}.gif`
-          const url = await uploadToB2(gifBuffer, key, 'image/gif')
-
-          let thumbnailUrl = null
-          if (previewUrl) {
-            const thumbResponse = await fetch(previewUrl)
-            const thumbBuffer = Buffer.from(await thumbResponse.arrayBuffer())
-            const thumbKey = `gifs/imports/tenor/${slug}_thumb.gif`
-            thumbnailUrl = await uploadToB2(thumbBuffer, thumbKey, 'image/gif')
-          }
-
+          return gifUrl && !existingMap.has(result.id)
+        })
+        .map(result => {
           const dimensions = result.media_formats?.gif?.dims || [0, 0]
-
-          // Extract tags from query and description
-          const tagsToCreate = new Set<string>()
-          
-          // Add query as a tag (split by spaces and clean)
-          const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 2)
-          queryWords.forEach(word => tagsToCreate.add(word))
-          
-          // Add words from description (if available)
-          if (result.content_description) {
-            const descWords = result.content_description.toLowerCase()
-              .split(/\s+/)
-              .filter(word => word.length > 2 && !['the', 'and', 'for', 'with', 'from'].includes(word))
-              .slice(0, 5) // Limit to 5 words from description
-            descWords.forEach(word => tagsToCreate.add(word))
+          return {
+            sourceId: result.id,
+            title: result.content_description || query,
+            gifUrl: result.media_formats?.gif?.url || result.media_formats?.mediumgif?.url || '',
+            previewUrl: result.media_formats?.tinygif?.url,
+            sourceUrl: result.url,
+            width: dimensions[0] || 0,
+            height: dimensions[1] || 0,
+            source: 'TENOR' as const,
           }
+        })
 
-          const gif = await prisma.gif.create({
-            data: {
-              slug,
-              title: result.content_description || query,
-              url,
-              thumbnailUrl,
-              width: dimensions[0] || 0,
-              height: dimensions[1] || 0,
-              fileSize: gifBuffer.length,
-              source: 'TENOR',
-              sourceId: result.id,
-              sourceUrl: result.url,
-              userId: admin.id,
-            },
-          })
+      const skippedDuplicates = results.length - gifsToImport.length
 
-          // Create and assign tags
-          for (const tagName of tagsToCreate) {
-            try {
-              // Upsert tag (create if doesn't exist)
-              const tag = await prisma.tag.upsert({
-                where: { slug: tagName },
-                update: {},
-                create: {
-                  name: tagName,
-                  slug: tagName,
-                },
-              })
-
-              // Connect tag to GIF
-              await prisma.tagOnGif.create({
-                data: {
-                  gifId: gif.id,
-                  tagId: tag.id,
-                },
-              })
-            } catch (e) {
-              // Ignore tag creation errors (likely duplicates)
-              console.error('Error creating tag:', e)
-            }
-          }
-
-          imported++
-        } catch (e) {
-          console.error('Error importing Tenor gif:', e)
-          failed++
+      // Import concurrently
+      const { imported, failed, skipped } = await importGifsBatch(
+        gifsToImport,
+        {
+          userId: admin.id,
+          query,
+          concurrency: Math.min(concurrency, 10), // Max 10 concurrent
+          skipDuplicates: true,
         }
-      }
+      )
 
       await prisma.importJob.update({
         where: { id: importJob.id },
@@ -205,6 +136,7 @@ export async function POST(request: NextRequest) {
         success: true,
         imported,
         failed,
+        skipped: skipped + skippedDuplicates,
         total: results.length,
         jobId: importJob.id,
         hasNextPage: !!next,
@@ -258,6 +190,10 @@ export async function GET(request: NextRequest) {
 
     const { results, next } = await searchTenor(query, limit, pos)
 
+    // Check which ones are already imported
+    const sourceIds = results.map(r => r.id)
+    const existingMap = await checkExistingBySourceId('TENOR', sourceIds)
+
     return NextResponse.json({
       results: results.map((r) => ({
         id: r.id,
@@ -265,6 +201,7 @@ export async function GET(request: NextRequest) {
         url: r.media_formats?.gif?.url || r.media_formats?.mediumgif?.url,
         preview: r.media_formats?.tinygif?.url,
         sourceUrl: r.url,
+        alreadyImported: existingMap.has(r.id),
       })),
       totalCount: results.length,
       hasNextPage: !!next,

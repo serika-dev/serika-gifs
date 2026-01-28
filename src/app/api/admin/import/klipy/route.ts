@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/session'
-import { uploadToB2 } from '@/lib/storage'
-import { nanoid } from 'nanoid'
+import {
+  importGifsBatch,
+  GifToImport,
+  checkExistingBySourceId,
+} from '@/lib/import-utils'
 
 interface KlipySearchResult {
   results: KlipyGif[]
@@ -60,12 +63,12 @@ async function searchKlipy(query: string, limit: number = 20, page?: string): Pr
   }
 }
 
-// POST /api/admin/import/klipy - Import from Klipy
+// POST /api/admin/import/klipy - Import from Klipy (concurrent)
 export async function POST(request: NextRequest) {
   try {
     const admin = await requireAdmin()
 
-    const { query, limit = 20, pos } = await request.json()
+    const { query, limit = 50, pos, concurrency = 5 } = await request.json()
 
     if (!query) {
       return NextResponse.json(
@@ -91,110 +94,39 @@ export async function POST(request: NextRequest) {
         data: { totalItems: results.length },
       })
 
-      let imported = 0
-      let failed = 0
+      // Pre-check for existing GIFs to show skipped count
+      const sourceIds = results.map(r => r.id)
+      const existingMap = await checkExistingBySourceId('KLIPY', sourceIds)
 
-      for (const result of results) {
-        try {
-          // Check if already imported
-          const existing = await prisma.gif.findFirst({
-            where: {
-              source: 'KLIPY',
-              sourceId: result.id,
-            },
-          })
-
-          if (existing) {
-            continue
-          }
-
+      // Transform to common format
+      const gifsToImport: GifToImport[] = results
+        .filter(result => {
           const gifUrl = result.url || result.gif_url || result.media?.gif
+          return gifUrl && !existingMap.has(result.id)
+        })
+        .map(result => ({
+          sourceId: result.id,
+          title: result.title || result.description || query,
+          gifUrl: result.url || result.gif_url || result.media?.gif || '',
+          previewUrl: result.preview || result.thumbnail || result.media?.thumbnail,
+          sourceUrl: result.source_url || result.url,
+          width: result.width || 0,
+          height: result.height || 0,
+          source: 'KLIPY' as const,
+        }))
 
-          if (!gifUrl) {
-            failed++
-            continue
-          }
+      const skippedDuplicates = results.length - gifsToImport.length
 
-          const previewUrl = result.preview || result.thumbnail || result.media?.thumbnail
-
-          // Download and re-upload to B2
-          const gifResponse = await fetch(gifUrl)
-          const gifBuffer = Buffer.from(await gifResponse.arrayBuffer())
-          
-          const slug = nanoid(10)
-          const key = `gifs/imports/klipy/${slug}.gif`
-          const url = await uploadToB2(gifBuffer, key, 'image/gif')
-
-          let thumbnailUrl = null
-          if (previewUrl) {
-            const thumbResponse = await fetch(previewUrl)
-            const thumbBuffer = Buffer.from(await thumbResponse.arrayBuffer())
-            const thumbKey = `gifs/imports/klipy/${slug}_thumb.gif`
-            thumbnailUrl = await uploadToB2(thumbBuffer, thumbKey, 'image/gif')
-          }
-
-          // Extract tags from query and title/description
-          const tagsToCreate = new Set<string>()
-          
-          // Add query as a tag (split by spaces and clean)
-          const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 2)
-          queryWords.forEach(word => tagsToCreate.add(word))
-          
-          // Add words from title or description (if available)
-          const textSource = result.title || result.description || ''
-          if (textSource) {
-            const textWords = textSource.toLowerCase()
-              .split(/\s+/)
-              .filter(word => word.length > 2 && !['the', 'and', 'for', 'with', 'from'].includes(word))
-              .slice(0, 5)
-            textWords.forEach(word => tagsToCreate.add(word))
-          }
-
-          const gif = await prisma.gif.create({
-            data: {
-              slug,
-              title: result.title || result.description || query,
-              url,
-              thumbnailUrl,
-              width: result.width || 0,
-              height: result.height || 0,
-              fileSize: gifBuffer.length,
-              source: 'KLIPY',
-              sourceId: result.id,
-              sourceUrl: result.source_url || result.url,
-              userId: admin.id,
-            },
-          })
-
-          // Create and assign tags
-          for (const tagName of tagsToCreate) {
-            try {
-              const tag = await prisma.tag.upsert({
-                where: { slug: tagName },
-                update: {},
-                create: {
-                  name: tagName,
-                  slug: tagName,
-                },
-              })
-
-              await prisma.tagOnGif.create({
-                data: {
-                  gifId: gif.id,
-                  tagId: tag.id,
-                },
-              })
-            } catch (e) {
-              console.error('Error creating tag:', e)
-            }
-          }
-
-          imported++
-        } catch (e) {
-          console.error('Error importing Klipy gif:', e)
-          failed++
+      // Import concurrently
+      const { imported, failed, skipped } = await importGifsBatch(
+        gifsToImport,
+        {
+          userId: admin.id,
+          query,
+          concurrency: Math.min(concurrency, 10), // Max 10 concurrent
+          skipDuplicates: true,
         }
-      }
+      )
 
       await prisma.importJob.update({
         where: { id: importJob.id },
@@ -210,6 +142,7 @@ export async function POST(request: NextRequest) {
         success: true,
         imported,
         failed,
+        skipped: skipped + skippedDuplicates,
         total: results.length,
         jobId: importJob.id,
         hasNextPage: !!nextPage,
@@ -263,6 +196,10 @@ export async function GET(request: NextRequest) {
 
     const { results, nextPage } = await searchKlipy(query, limit, pos)
 
+    // Check which ones are already imported
+    const sourceIds = results.map(r => r.id)
+    const existingMap = await checkExistingBySourceId('KLIPY', sourceIds)
+
     return NextResponse.json({
       results: results.map((r) => ({
         id: r.id,
@@ -270,6 +207,7 @@ export async function GET(request: NextRequest) {
         url: r.url || r.gif_url || r.media?.gif,
         preview: r.preview || r.thumbnail || r.media?.thumbnail,
         sourceUrl: r.source_url,
+        alreadyImported: existingMap.has(r.id),
       })),
       totalCount: results.length,
       hasNextPage: !!nextPage,

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/session'
-import { uploadToB2 } from '@/lib/storage'
-import { nanoid } from 'nanoid'
+import {
+  importGifsBatch,
+  GifToImport,
+  checkExistingBySourceId,
+} from '@/lib/import-utils'
 
 interface GiphySearchResult {
   results: GiphyGif[]
@@ -41,12 +44,12 @@ async function searchGiphy(query: string, limit: number = 20, offset: number = 0
   }
 }
 
-// POST /api/admin/import/giphy - Import from Giphy
+// POST /api/admin/import/giphy - Import from Giphy (concurrent)
 export async function POST(request: NextRequest) {
   try {
     const admin = await requireAdmin()
 
-    const { query, limit = 20, offset = 0 } = await request.json()
+    const { query, limit = 50, offset = 0, concurrency = 5 } = await request.json()
 
     if (!query) {
       return NextResponse.json(
@@ -72,109 +75,40 @@ export async function POST(request: NextRequest) {
         data: { totalItems: results.length },
       })
 
-      let imported = 0
-      let failed = 0
+      // Pre-check for existing GIFs to show skipped count
+      const sourceIds = results.map(r => r.id)
+      const existingMap = await checkExistingBySourceId('GIPHY', sourceIds)
 
-      for (const result of results) {
-        try {
-          // Check if already imported
-          const existing = await prisma.gif.findFirst({
-            where: {
-              source: 'GIPHY',
-              sourceId: result.id,
-            },
-          })
-
-          if (existing) {
-            continue
-          }
-
+      // Transform to common format
+      const gifsToImport: GifToImport[] = results
+        .filter(result => {
           const gifUrl = result.images?.original?.url
+          return gifUrl && !existingMap.has(result.id)
+        })
+        .map(result => ({
+          sourceId: result.id,
+          title: result.title || query,
+          gifUrl: result.images!.original!.url,
+          previewUrl: result.images?.fixed_height_small?.url,
+          sourceUrl: result.url,
+          width: parseInt(result.images?.original?.width || '0'),
+          height: parseInt(result.images?.original?.height || '0'),
+          fileSize: parseInt(result.images?.original?.size || '0'),
+          source: 'GIPHY' as const,
+        }))
 
-          if (!gifUrl) {
-            failed++
-            continue
-          }
+      const skippedDuplicates = results.length - gifsToImport.length
 
-          const previewUrl = result.images?.fixed_height_small?.url
-
-          // Download and re-upload to B2
-          const gifResponse = await fetch(gifUrl)
-          const gifBuffer = Buffer.from(await gifResponse.arrayBuffer())
-          
-          const slug = nanoid(10)
-          const key = `gifs/imports/giphy/${slug}.gif`
-          const url = await uploadToB2(gifBuffer, key, 'image/gif')
-
-          let thumbnailUrl = null
-          if (previewUrl) {
-            const thumbResponse = await fetch(previewUrl)
-            const thumbBuffer = Buffer.from(await thumbResponse.arrayBuffer())
-            const thumbKey = `gifs/imports/giphy/${slug}_thumb.gif`
-            thumbnailUrl = await uploadToB2(thumbBuffer, thumbKey, 'image/gif')
-          }
-
-          // Extract tags from query and title
-          const tagsToCreate = new Set<string>()
-          
-          // Add query as a tag (split by spaces and clean)
-          const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 2)
-          queryWords.forEach(word => tagsToCreate.add(word))
-          
-          // Add words from title (if available)
-          if (result.title) {
-            const titleWords = result.title.toLowerCase()
-              .split(/\s+/)
-              .filter(word => word.length > 2 && !['the', 'and', 'for', 'with', 'from'].includes(word))
-              .slice(0, 5)
-            titleWords.forEach(word => tagsToCreate.add(word))
-          }
-
-          const gif = await prisma.gif.create({
-            data: {
-              slug,
-              title: result.title || query,
-              url,
-              thumbnailUrl,
-              width: parseInt(result.images?.original?.width || '0') || 0,
-              height: parseInt(result.images?.original?.height || '0') || 0,
-              fileSize: parseInt(result.images?.original?.size || '0') || gifBuffer.length,
-              source: 'GIPHY',
-              sourceId: result.id,
-              sourceUrl: result.url,
-              userId: admin.id,
-            },
-          })
-
-          // Create and assign tags
-          for (const tagName of tagsToCreate) {
-            try {
-              const tag = await prisma.tag.upsert({
-                where: { slug: tagName },
-                update: {},
-                create: {
-                  name: tagName,
-                  slug: tagName,
-                },
-              })
-
-              await prisma.tagOnGif.create({
-                data: {
-                  gifId: gif.id,
-                  tagId: tag.id,
-                },
-              })
-            } catch (e) {
-              console.error('Error creating tag:', e)
-            }
-          }
-
-          imported++
-        } catch (e) {
-          console.error('Error importing Giphy gif:', e)
-          failed++
+      // Import concurrently
+      const { imported, failed, skipped } = await importGifsBatch(
+        gifsToImport,
+        {
+          userId: admin.id,
+          query,
+          concurrency: Math.min(concurrency, 10), // Max 10 concurrent
+          skipDuplicates: true,
         }
-      }
+      )
 
       await prisma.importJob.update({
         where: { id: importJob.id },
@@ -193,6 +127,7 @@ export async function POST(request: NextRequest) {
         success: true,
         imported,
         failed,
+        skipped: skipped + skippedDuplicates,
         total: results.length,
         jobId: importJob.id,
         hasNextPage,
@@ -248,6 +183,10 @@ export async function GET(request: NextRequest) {
 
     const { results, totalCount } = await searchGiphy(query, limit, offset)
 
+    // Check which ones are already imported
+    const sourceIds = results.map(r => r.id)
+    const existingMap = await checkExistingBySourceId('GIPHY', sourceIds)
+
     const nextOffset = offset + limit
     const hasNextPage = nextOffset < totalCount
 
@@ -258,6 +197,7 @@ export async function GET(request: NextRequest) {
         url: r.images?.original?.url,
         preview: r.images?.fixed_height_small?.url,
         sourceUrl: r.url,
+        alreadyImported: existingMap.has(r.id),
       })),
       totalCount,
       hasNextPage,

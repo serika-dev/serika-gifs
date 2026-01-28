@@ -6,7 +6,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select } from '@/components/ui/select'
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { 
@@ -32,6 +38,7 @@ interface GifPreview {
   url: string
   preview: string
   sourceUrl?: string
+  alreadyImported?: boolean
 }
 
 interface ImportJob {
@@ -144,7 +151,7 @@ export default function AdminImportPage() {
         return
       }
 
-      toast.success(`Imported ${data.imported} GIFs (${data.failed} failed)`)
+      toast.success(`Imported ${data.imported} GIFs (${data.skipped || 0} skipped, ${data.failed} failed)`)
       loadImportJobs()
     } catch {
       toast.error('Import failed')
@@ -194,7 +201,8 @@ export default function AdminImportPage() {
         totalFailed += data.failed || 0
         pageCount++
 
-        toast.info(`Page ${pageCount}/${pagesToImport}: Imported ${data.imported} GIFs`)
+        const skipped = data.skipped || 0
+        toast.info(`Page ${pageCount}/${pagesToImport}: Imported ${data.imported} GIFs${skipped > 0 ? ` (${skipped} skipped)` : ''}`)
 
         // Check if there are more pages
         if (!data.hasNextPage || !data.nextPos) {
@@ -346,20 +354,20 @@ export default function AdminImportPage() {
                         
                         <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
                           <div className="flex-1 flex gap-2 w-full sm:w-auto">
-                            <div className="flex-1 sm:flex-none sm:w-24">
+                            <div className="flex-1 sm:flex-none sm:w-28">
                               <Label htmlFor="maxPages" className="sr-only">Max Pages</Label>
-                              <Select
-                                id="maxPages"
-                                value={maxPages}
-                                onChange={(e) => setMaxPages(e.target.value)}
-                                className="h-10 sm:h-9"
-                              >
-                                <option value="1">1 page</option>
-                                <option value="2">2 pages</option>
-                                <option value="3">3 pages</option>
-                                <option value="5">5 pages</option>
-                                <option value="10">10 pages</option>
-                                <option value="20">20 pages</option>
+                              <Select value={maxPages} onValueChange={setMaxPages}>
+                                <SelectTrigger className="h-10 sm:h-9">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">1 page</SelectItem>
+                                  <SelectItem value="2">2 pages</SelectItem>
+                                  <SelectItem value="3">3 pages</SelectItem>
+                                  <SelectItem value="5">5 pages</SelectItem>
+                                  <SelectItem value="10">10 pages</SelectItem>
+                                  <SelectItem value="20">20 pages</SelectItem>
+                                </SelectContent>
                               </Select>
                             </div>
                             <Button
@@ -525,26 +533,45 @@ function GifGrid({ previews, isLoading }: { previews: GifPreview[], isLoading: b
     )
   }
 
+  const alreadyImportedCount = previews.filter(p => p.alreadyImported).length
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
-      {previews.map((gif) => (
-        <div
-          key={gif.id}
-          className="relative aspect-square rounded-lg overflow-hidden border border-border/50 bg-muted group cursor-pointer"
-        >
-          <Image
-            src={gif.preview || gif.url}
-            alt={gif.title || 'Animated GIF preview'}
-            fill
-            className="object-cover"
-            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
-            unoptimized
-          />
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 sm:transition-opacity flex items-end p-2">
-            <p className="text-xs text-white truncate">{gif.title}</p>
-          </div>
+    <div className="space-y-3">
+      {alreadyImportedCount > 0 && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-2">
+          <CheckCircle className="h-4 w-4 text-green-500" />
+          <span>{alreadyImportedCount} of {previews.length} already imported</span>
         </div>
-      ))}
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
+        {previews.map((gif) => (
+          <div
+            key={gif.id}
+            className={`relative aspect-square rounded-lg overflow-hidden border bg-muted group cursor-pointer ${
+              gif.alreadyImported 
+                ? 'border-green-500/50 opacity-60' 
+                : 'border-border/50'
+            }`}
+          >
+            <Image
+              src={gif.preview || gif.url}
+              alt={gif.title || 'Animated GIF preview'}
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+              unoptimized
+            />
+            {gif.alreadyImported && (
+              <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
+                <CheckCircle className="h-3 w-3 text-white" />
+              </div>
+            )}
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 sm:transition-opacity flex items-end p-2">
+              <p className="text-xs text-white truncate">{gif.title}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
