@@ -365,6 +365,7 @@ async function main() {
   const args = process.argv.slice(2)
   const dryRun = args.includes('--dry-run')
   const verbose = args.includes('--verbose')
+  // Default to MP4→GIF conversion for max quality, use --use-gif to skip
   const useGif = args.includes('--use-gif')
   
   const sourceArg = args.find(a => a.startsWith('--source='))
@@ -374,7 +375,7 @@ async function main() {
   const limit = limitArg ? parseInt(limitArg.split('=')[1]) : undefined
   
   const concurrencyArg = args.find(a => a.startsWith('--concurrency='))
-  const concurrency = concurrencyArg ? parseInt(concurrencyArg.split('=')[1]) : 20
+  const concurrency = concurrencyArg ? parseInt(concurrencyArg.split('=')[1]) : 50
 
   console.log('═══════════════════════════════════════════════════')
   console.log('     Re-Import GIFs at Highest Resolution')
@@ -383,9 +384,9 @@ async function main() {
     console.log('🔸 DRY RUN MODE - No changes will be made')
   }
   if (useGif) {
-    console.log('📌 Using direct GIF download (--use-gif)')
+    console.log('📌 Using direct GIF download (fast, --use-gif)')
   } else {
-    console.log('🎬 Using MP4 → GIF conversion for best quality')
+    console.log('🎬 Using MP4 → GIF conversion for max quality')
   }
   if (sourceFilter) {
     console.log(`📌 Filtering by source: ${sourceFilter}`)
@@ -472,6 +473,7 @@ async function main() {
     const withMp4 = Array.from(hiResMap.values()).filter(v => v.mp4Url).length
     console.log(`   ✓ Got data for ${hiResMap.size}/${tenorIds.length} GIFs (${withMp4} with MP4)`)
     
+    const tenorStart = Date.now()
     for (let i = 0; i < tenorGifs.length; i += concurrency) {
       const batch = tenorGifs.slice(i, i + concurrency)
       
@@ -502,16 +504,20 @@ async function main() {
       }
       
       const processed = Math.min(i + concurrency, tenorGifs.length)
-      if (processed % 10 === 0 || processed === tenorGifs.length) {
-        console.log(`   Processed ${processed}/${tenorGifs.length}...`)
-      }
+      const elapsed = (Date.now() - tenorStart) / 1000
+      const rate = processed / elapsed
+      const remaining = (tenorGifs.length - processed) / rate
+      const eta = remaining > 60 ? `${(remaining / 60).toFixed(1)}m` : `${remaining.toFixed(0)}s`
+      process.stdout.write(`\r   Processed ${processed}/${tenorGifs.length} (${rate.toFixed(1)}/s, ETA: ${eta})   `)
     }
+    console.log() // newline after progress
   }
 
   // Process Giphy GIFs
   if (giphyGifs.length > 0 && GIPHY_API_KEY) {
     console.log(`\n🎬 Processing ${giphyGifs.length} Giphy GIFs...`)
     
+    const giphyStart = Date.now()
     for (let i = 0; i < giphyGifs.length; i += concurrency) {
       const batch = giphyGifs.slice(i, i + concurrency)
       
@@ -542,12 +548,15 @@ async function main() {
       }
       
       const processed = Math.min(i + concurrency, giphyGifs.length)
-      if (processed % 10 === 0 || processed === giphyGifs.length) {
-        console.log(`   Processed ${processed}/${giphyGifs.length}...`)
-      }
+      const elapsed = (Date.now() - giphyStart) / 1000
+      const rate = processed / elapsed
+      const remaining = (giphyGifs.length - processed) / rate
+      const eta = remaining > 60 ? `${(remaining / 60).toFixed(1)}m` : `${remaining.toFixed(0)}s`
+      process.stdout.write(`\r   Processed ${processed}/${giphyGifs.length} (${rate.toFixed(1)}/s, ETA: ${eta})   `)
       
       await new Promise(r => setTimeout(r, 100))
     }
+    console.log() // newline after progress
   }
 
   console.log('\n═══════════════════════════════════════════════════')
