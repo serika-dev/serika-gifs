@@ -6,10 +6,18 @@ import { generateAndUploadThumbnail } from '@/lib/thumbnail'
 import { generateMp4FromGif, generateWebmFromGif, generateWebmFromMp4 } from '@/lib/media-convert'
 import { nanoid } from 'nanoid'
 import imageSize from 'image-size'
+import { checkRateLimit, rateLimitResponse, addRateLimitHeaders } from '@/lib/rate-limit'
 
-// GET /api/gifs - List GIFs
+// GET /api/gifs - List GIFs (public, rate limited)
 export async function GET(request: NextRequest) {
   try {
+    // Check rate limit for anonymous users
+    const rateLimitResult = await checkRateLimit(request)
+    
+    if (!rateLimitResult.allowed) {
+      return rateLimitResponse(rateLimitResult.resetTime)
+    }
+
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100)
@@ -139,7 +147,7 @@ export async function GET(request: NextRequest) {
       createdAt: gif.createdAt,
     }))
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       gifs: formattedGifs,
       pagination: {
         page,
@@ -148,6 +156,9 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
       },
     })
+
+    // Add rate limit headers for anonymous users
+    return addRateLimitHeaders(response, rateLimitResult)
   } catch (error) {
     console.error('Error fetching gifs:', error)
     return NextResponse.json(
