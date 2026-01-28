@@ -133,7 +133,24 @@ export async function POST(request: NextRequest) {
             thumbnailUrl = await uploadToB2(thumbBuffer, thumbKey, 'image/gif')
           }
 
-          await prisma.gif.create({
+          // Extract tags from query and title/description
+          const tagsToCreate = new Set<string>()
+          
+          // Add query as a tag (split by spaces and clean)
+          const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 2)
+          queryWords.forEach(word => tagsToCreate.add(word))
+          
+          // Add words from title or description (if available)
+          const textSource = result.title || result.description || ''
+          if (textSource) {
+            const textWords = textSource.toLowerCase()
+              .split(/\s+/)
+              .filter(word => word.length > 2 && !['the', 'and', 'for', 'with', 'from'].includes(word))
+              .slice(0, 5)
+            textWords.forEach(word => tagsToCreate.add(word))
+          }
+
+          const gif = await prisma.gif.create({
             data: {
               slug,
               title: result.title || result.description || query,
@@ -148,6 +165,29 @@ export async function POST(request: NextRequest) {
               userId: admin.id,
             },
           })
+
+          // Create and assign tags
+          for (const tagName of tagsToCreate) {
+            try {
+              const tag = await prisma.tag.upsert({
+                where: { slug: tagName },
+                update: {},
+                create: {
+                  name: tagName,
+                  slug: tagName,
+                },
+              })
+
+              await prisma.tagOnGif.create({
+                data: {
+                  gifId: gif.id,
+                  tagId: tag.id,
+                },
+              })
+            } catch (e) {
+              console.error('Error creating tag:', e)
+            }
+          }
 
           imported++
         } catch (e) {
