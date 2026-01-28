@@ -156,11 +156,22 @@ export default function UploadPage() {
                 {preview ? (
                   <div className="relative mt-2">
                     <div className="relative rounded-lg overflow-hidden bg-muted border border-border/50">
-                      <img
-                        src={preview}
-                        alt="Preview"
-                        className="max-h-[400px] w-full object-contain"
-                      />
+                      {file?.type.startsWith('video/') ? (
+                        <video
+                          src={preview}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="max-h-[400px] w-full object-contain"
+                        />
+                      ) : (
+                        <img
+                          src={preview}
+                          alt="Preview"
+                          className="max-h-[400px] w-full object-contain"
+                        />
+                      )}
                       <Button
                         type="button"
                         variant="destructive"
@@ -172,7 +183,7 @@ export default function UploadPage() {
                       </Button>
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">
-                      {file?.name} ({(file?.size || 0 / 1024 / 1024).toFixed(2)} MB)
+                      {file?.name} ({((file?.size || 0) / 1024 / 1024).toFixed(2)} MB)
                     </p>
                   </div>
                 ) : (

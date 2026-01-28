@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { uploadToB2 } from '@/lib/storage'
 import { generateAndUploadThumbnail } from '@/lib/thumbnail'
+import { generateMp4FromGif, generateWebmFromGif, generateWebmFromMp4 } from '@/lib/media-convert'
 import { nanoid } from 'nanoid'
 import imageSize from 'image-size'
 
@@ -226,15 +227,49 @@ export async function POST(request: NextRequest) {
     // Upload to B2
     const url = await uploadToB2(buffer, key, file.type)
 
-    // Generate static thumbnail for GIFs
+    // Generate MP4 and WebM versions, and thumbnail
+    let mp4Url: string | null = null
+    let webmUrl: string | null = null
     let thumbnailUrl: string | null = null
+
     if (file.type === 'image/gif') {
+      // Generate MP4 from GIF
+      try {
+        const mp4Buffer = await generateMp4FromGif(buffer, slug)
+        const mp4Key = `gifs/${session.id}/${slug}.mp4`
+        mp4Url = await uploadToB2(mp4Buffer, mp4Key, 'video/mp4')
+      } catch (e) {
+        console.error('Error generating MP4:', e)
+      }
+
+      // Generate WebM from GIF
+      try {
+        const webmBuffer = await generateWebmFromGif(buffer, slug)
+        const webmKey = `gifs/${session.id}/${slug}.webm`
+        webmUrl = await uploadToB2(webmBuffer, webmKey, 'video/webm')
+      } catch (e) {
+        console.error('Error generating WebM:', e)
+      }
+
+      // Generate static thumbnail
       try {
         thumbnailUrl = await generateAndUploadThumbnail(buffer, session.id, slug)
       } catch (e) {
         console.error('Error generating thumbnail:', e)
-        // Continue without thumbnail
       }
+    } else if (file.type === 'video/mp4') {
+      // For MP4 uploads, just generate WebM
+      mp4Url = url  // The original is already MP4
+      try {
+        const webmBuffer = await generateWebmFromMp4(buffer, slug)
+        const webmKey = `gifs/${session.id}/${slug}.webm`
+        webmUrl = await uploadToB2(webmBuffer, webmKey, 'video/webm')
+      } catch (e) {
+        console.error('Error generating WebM from MP4:', e)
+      }
+    } else if (file.type === 'video/webm') {
+      // For WebM uploads, the original is already WebM
+      webmUrl = url
     }
 
     // Create GIF record
@@ -244,6 +279,8 @@ export async function POST(request: NextRequest) {
         title,
         description: description || null,
         url,
+        mp4Url,
+        webmUrl,
         thumbnailUrl,
         width,
         height,
