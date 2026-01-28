@@ -44,9 +44,7 @@ export async function GET(request: NextRequest) {
       where.userId = userId
     }
 
-    if (source && ['UPLOAD', 'TENOR', 'GIPHY', 'KLIPY'].includes(source)) {
-      where.source = source
-    }
+    // Source filtering removed - all GIFs treated equally
 
     const [gifs, total] = await Promise.all([
       prisma.gif.findMany({

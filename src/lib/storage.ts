@@ -24,7 +24,8 @@ export async function uploadToB2(
 
   await s3Client.send(command)
   
-  return `https://${process.env.B2_BUCKET_NAME}.${process.env.B2_ENDPOINT}/${key}`
+  // Use CDN URL instead of direct B2 URL
+  return `https://cdn.ado.wtf/${key}`
 }
 
 export async function deleteFromB2(key: string): Promise<void> {
@@ -63,7 +64,7 @@ export async function getPresignedDownloadUrl(
 }
 
 export function getPublicUrl(key: string): string {
-  return `https://${process.env.B2_BUCKET_NAME}.${process.env.B2_ENDPOINT}/${key}`
+  return `https://cdn.ado.wtf/${key}`
 }
 
 export { s3Client }

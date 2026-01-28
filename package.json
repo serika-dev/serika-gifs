@@ -16,7 +16,9 @@
     "db:generate-thumbnails": "bun run scripts/generate-thumbnails.ts",
     "db:generate-thumbnails:dry": "bun run scripts/generate-thumbnails.ts --dry-run --verbose",
     "db:migrate-imports": "bun run scripts/migrate-imports.ts",
-    "db:migrate-imports:dry": "bun run scripts/migrate-imports.ts --dry-run --verbose"
+    "db:migrate-imports:dry": "bun run scripts/migrate-imports.ts --dry-run --verbose",
+    "db:migrate-cdn": "bun run scripts/migrate-cdn-urls.ts",
+    "db:migrate-cdn:dry": "bun run scripts/migrate-cdn-urls.ts --dry-run --verbose"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.975.0",

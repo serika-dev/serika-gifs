@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { Header } from '@/components/header'
 import { GifGrid } from '@/components/gif-grid'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { 
   Select,
@@ -20,7 +19,6 @@ import {
   Heart, 
   Eye,
   Calendar,
-  SlidersHorizontal
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -30,7 +28,6 @@ type TimeRange = 'day' | 'week' | 'month' | 'all'
 export default function TrendingPage() {
   const [sort, setSort] = useState<SortOption>('trending')
   const [timeRange, setTimeRange] = useState<TimeRange>('week')
-  const [source, setSource] = useState<string>('all')
 
   const sortOptions = [
     { value: 'trending', label: 'Trending', icon: TrendingUp },
@@ -44,14 +41,6 @@ export default function TrendingPage() {
     { value: 'week', label: 'This Week' },
     { value: 'month', label: 'This Month' },
     { value: 'all', label: 'All Time' },
-  ]
-
-  const sourceOptions = [
-    { value: 'all', label: 'All Sources' },
-    { value: 'UPLOAD', label: 'Uploads' },
-    { value: 'GIPHY', label: 'Giphy' },
-    { value: 'TENOR', label: 'Tenor' },
-    { value: 'KLIPY', label: 'Klipy' },
   ]
 
   const currentSort = sortOptions.find(s => s.value === sort)
@@ -120,27 +109,15 @@ export default function TrendingPage() {
             </Select>
           </div>
 
-          {/* Time Range & Source Filters */}
-          <div className="flex gap-2 sm:gap-3 sm:ml-auto">
+          {/* Time Range Filter */}
+          <div className="sm:ml-auto">
             <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
-              <SelectTrigger className="w-[130px] sm:w-[140px]">
+              <SelectTrigger className="w-[140px]">
                 <Calendar className="h-4 w-4 mr-2" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {timeRangeOptions.map(({ value, label }) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={source} onValueChange={setSource}>
-              <SelectTrigger className="w-[130px] sm:w-[140px]">
-                <SlidersHorizontal className="h-4 w-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {sourceOptions.map(({ value, label }) => (
                   <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}
               </SelectContent>
@@ -160,13 +137,11 @@ export default function TrendingPage() {
               📁 Collections
             </Badge>
           </Link>
-          <Badge 
-            variant={source === 'UPLOAD' ? 'default' : 'outline'} 
-            className="cursor-pointer hover:bg-primary/10 whitespace-nowrap"
-            onClick={() => setSource(source === 'UPLOAD' ? 'all' : 'UPLOAD')}
-          >
-            ⬆️ User Uploads
-          </Badge>
+          <Link href="/favorites">
+            <Badge variant="outline" className="cursor-pointer hover:bg-primary/10 whitespace-nowrap">
+              ❤️ Favorites
+            </Badge>
+          </Link>
           <Badge 
             variant="outline" 
             className="cursor-pointer hover:bg-primary/10 whitespace-nowrap"
@@ -177,9 +152,8 @@ export default function TrendingPage() {
 
         {/* GIF Grid */}
         <GifGrid 
-          source={source !== 'all' ? source : undefined}
           emptyMessage="No GIFs found"
-          emptySubMessage="Try adjusting your filters or check back later!"
+          emptySubMessage="Check back later for new content!"
         />
 
         {/* Stats Section */}

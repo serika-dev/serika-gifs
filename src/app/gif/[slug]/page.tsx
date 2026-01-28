@@ -169,22 +169,24 @@ export default async function GifPage({
             )}
 
             {/* Source */}
-            {gif.source !== 'UPLOAD' && gif.sourceUrl && (
+            {gif.source !== 'UPLOAD' && (
               <>
                 <Separator />
-                <div>
-                  <h3 className="text-xs sm:text-sm lg:text-base font-medium mb-1 sm:mb-1.5">Source</h3>
-                  <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground">
-                    Imported from {gif.source.toLowerCase()}
-                  </p>
-                  <a
-                    href={gif.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] sm:text-xs lg:text-sm text-primary hover:underline break-all"
-                  >
-                    View original
-                  </a>
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Originally from</p>
+                    <p className="text-sm font-medium capitalize">{gif.source.toLowerCase()}</p>
+                  </div>
+                  {gif.sourceUrl && (
+                    <a
+                      href={gif.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline"
+                    >
+                      View source →
+                    </a>
+                  )}
                 </div>
               </>
             )}

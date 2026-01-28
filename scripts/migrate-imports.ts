@@ -192,10 +192,10 @@ async function main() {
           }
         }
 
-        // Update database
-        const newUrl = `https://${BUCKET_NAME}.${BUCKET_ENDPOINT}/${newMainKey}`
+        // Update database with CDN URL
+        const newUrl = `https://cdn.ado.wtf/${newMainKey}`
         const newThumbUrl = newThumbKey 
-          ? `https://${BUCKET_NAME}.${BUCKET_ENDPOINT}/${newThumbKey}`
+          ? `https://cdn.ado.wtf/${newThumbKey}`
           : gif.thumbnailUrl
 
         await prisma.gif.update({

@@ -74,7 +74,7 @@ async function uploadToB2(buffer: Buffer, key: string, contentType: string): Pro
   })
   
   await s3Client.send(command)
-  return `https://${process.env.B2_BUCKET_NAME}.${process.env.B2_ENDPOINT}/${key}`
+  return `https://cdn.ado.wtf/${key}`
 }
 
 async function generateStaticThumbnail(gifBuffer: Buffer): Promise<Buffer> {
@@ -111,9 +111,7 @@ async function main() {
   console.log('')
   
   // Find GIFs that need thumbnails
-  const where: any = {
-    url: { not: null },
-  }
+  const where: any = {}
   
   if (!force) {
     // Only process GIFs without thumbnails or with animated (GIF) thumbnails
