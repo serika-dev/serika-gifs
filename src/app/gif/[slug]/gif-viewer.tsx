@@ -121,51 +121,51 @@ export function GifViewer({ gif }: GifViewerProps) {
 
   return (
     <Card className="overflow-hidden border-border/50">
-      <div className="relative bg-muted flex items-center justify-center min-h-[300px]">
+      <div className="relative bg-muted flex items-center justify-center min-h-[250px] sm:min-h-[300px]">
         <img
           src={gif.url}
           alt={gif.title}
-          className="max-w-full max-h-[70vh] object-contain"
+          className="max-w-full max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] object-contain w-auto h-auto"
         />
       </div>
 
-      <div className="flex items-center justify-between p-4 border-t border-border/50">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 p-3 sm:p-4 border-t border-border/50">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <Button
             variant={isFavorited ? 'default' : 'outline'}
             size="sm"
             onClick={toggleFavorite}
             disabled={isLoading}
-            className={isFavorited ? 'bg-red-500 hover:bg-red-600' : ''}
+            className={`flex-1 sm:flex-none ${isFavorited ? 'bg-red-500 hover:bg-red-600' : ''}`}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Heart className={`h-4 w-4 ${isFavorited ? 'fill-current' : ''}`} />
             )}
-            <span className="ml-2">{isFavorited ? 'Favorited' : 'Favorite'}</span>
+            <span className="ml-2 hidden xs:inline">{isFavorited ? 'Favorited' : 'Favorite'}</span>
           </Button>
 
-          <Button variant="outline" size="sm" onClick={shareGif}>
-            <Share2 className="h-4 w-4 mr-2" />
-            Share
+          <Button variant="outline" size="sm" onClick={shareGif} className="flex-1 sm:flex-none">
+            <Share2 className="h-4 w-4 sm:mr-2" />
+            <span className="ml-2 sm:ml-0 hidden xs:inline">Share</span>
+          </Button>
+          
+          <Button variant="outline" size="sm" onClick={copyUrl} className="flex-1 sm:flex-none hidden xs:flex">
+            <Copy className="h-4 w-4 sm:mr-2" />
+            <span className="ml-2 sm:ml-0 hidden sm:inline">Copy URL</span>
           </Button>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={copyUrl}>
-            <Copy className="h-4 w-4 mr-2" />
-            Copy URL
-          </Button>
-
-          <Button variant="outline" size="sm" onClick={downloadGif}>
-            <Download className="h-4 w-4 mr-2" />
-            Download
+          <Button variant="outline" size="sm" onClick={downloadGif} className="flex-1 sm:flex-none">
+            <Download className="h-4 w-4 sm:mr-2" />
+            <span className="ml-2 sm:ml-0 hidden sm:inline">Download</span>
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-9 w-9">
+              <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -177,6 +177,10 @@ export function GifViewer({ gif }: GifViewerProps) {
               <DropdownMenuItem onClick={copyEmbed}>
                 <Code className="mr-2 h-4 w-4" />
                 Copy embed code
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={copyUrl} className="xs:hidden">
+                <Copy className="mr-2 h-4 w-4" />
+                Copy GIF URL
               </DropdownMenuItem>
               {canEdit && (
                 <>

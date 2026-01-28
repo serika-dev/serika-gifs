@@ -1,11 +1,19 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { GifCard, GifCardSkeleton } from '@/components/gif-card'
 import type { Gif } from '@/hooks/use-gifs'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 
 interface GifGridProps {
   initialGifs?: Gif[]
@@ -30,9 +38,8 @@ export function GifGrid({
 }: GifGridProps) {
   const [gifs, setGifs] = useState<Gif[]>(initialGifs || [])
   const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
+  const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(!initialGifs)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   // Responsive grid classes with better mobile support
   const gridClasses = {
@@ -41,17 +48,13 @@ export function GifGrid({
     wide: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
   }
 
-  const fetchGifs = useCallback(async (pageNum: number, append: boolean = false) => {
-    if (pageNum === 1) {
-      setIsLoading(true)
-    } else {
-      setIsLoadingMore(true)
-    }
+  const fetchGifs = useCallback(async (pageNum: number) => {
+    setIsLoading(true)
 
     try {
       const params = new URLSearchParams({
         page: pageNum.toString(),
-        limit: '24',
+        limit: '50',
       })
 
       if (search) params.set('search', search)
@@ -62,18 +65,15 @@ export function GifGrid({
       const response = await fetch(`/api/gifs?${params}`)
       const data = await response.json()
 
-      if (append) {
-        setGifs((prev) => [...prev, ...data.gifs])
-      } else {
-        setGifs(data.gifs)
-      }
-
-      setHasMore(data.pagination.page < data.pagination.totalPages)
+      setGifs(data.gifs)
+      setTotalPages(data.pagination.totalPages)
+      
+      // Scroll to top when changing pages
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch {
       toast.error('Failed to load GIFs')
     } finally {
       setIsLoading(false)
-      setIsLoadingMore(false)
     }
   }, [search, tag, userId, source])
 
@@ -83,10 +83,48 @@ export function GifGrid({
     }
   }, [fetchGifs, initialGifs])
 
-  const loadMore = () => {
-    const nextPage = page + 1
-    setPage(nextPage)
-    fetchGifs(nextPage, true)
+  const goToPage = (pageNum: number) => {
+    setPage(pageNum)
+    fetchGifs(pageNum)
+  }
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages: (number | 'ellipsis')[] = []
+    const maxVisible = 5
+
+    if (totalPages <= maxVisible + 2) {
+      // Show all pages if total is small
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      // Always show first page
+      pages.push(1)
+
+      if (page > 3) {
+        pages.push('ellipsis')
+      }
+
+      // Show pages around current page
+      const start = Math.max(2, page - 1)
+      const end = Math.min(totalPages - 1, page + 1)
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i)
+      }
+
+      if (page < totalPages - 2) {
+        pages.push('ellipsis')
+      }
+
+      // Always show last page
+      if (totalPages > 1) {
+        pages.push(totalPages)
+      }
+    }
+
+    return pages
   }
 
   if (isLoading) {
@@ -116,25 +154,40 @@ export function GifGrid({
         ))}
       </div>
 
-      {hasMore && (
-        <div className="flex justify-center pt-2">
-          <Button
-            variant="outline"
-            onClick={loadMore}
-            disabled={isLoadingMore}
-            className="w-full sm:w-auto min-w-[140px]"
-            size="lg"
-          >
-            {isLoadingMore ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              'Load More'
-            )}
-          </Button>
-        </div>
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent className="flex-wrap gap-1">
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => page > 1 && goToPage(page - 1)}
+                className={page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+
+            {getPageNumbers().map((pageNum, idx) => (
+              <PaginationItem key={idx}>
+                {pageNum === 'ellipsis' ? (
+                  <PaginationEllipsis />
+                ) : (
+                  <PaginationLink
+                    onClick={() => goToPage(pageNum)}
+                    isActive={page === pageNum}
+                    className="cursor-pointer"
+                  >
+                    {pageNum}
+                  </PaginationLink>
+                )}
+              </PaginationItem>
+            ))}
+
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => page < totalPages && goToPage(page + 1)}
+                className={page >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       )}
     </div>
   )

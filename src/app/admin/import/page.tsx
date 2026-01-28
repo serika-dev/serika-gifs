@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { 
@@ -55,9 +56,10 @@ interface PaginationInfo {
 export default function AdminImportPage() {
   const [activeTab, setActiveTab] = useState('tenor')
   const [searchQuery, setSearchQuery] = useState('')
+  const [maxPages, setMaxPages] = useState('5')
   const [isSearching, setIsSearching] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
-  const [isImportingAll, setIsImportingAll] = useState(false)
+  const [isImportingMultiple, setIsImportingMultiple] = useState(false)
   const [previews, setPreviews] = useState<GifPreview[]>([])
   const [importJobs, setImportJobs] = useState<ImportJob[]>([])
   const [isLoadingJobs, setIsLoadingJobs] = useState(false)
@@ -126,7 +128,6 @@ export default function AdminImportPage() {
 
     try {
       // Import the currently displayed results by re-fetching with the same query
-      // Note: This re-searches and imports - it doesn't use cached results
       const response = await fetch(`/api/admin/import/${activeTab}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,21 +153,26 @@ export default function AdminImportPage() {
     }
   }
 
-  const handleImportAllPages = async () => {
+  const handleImportMultiplePages = async () => {
     if (!searchQuery.trim()) {
       toast.error('Please enter a search query')
       return
     }
 
-    setIsImportingAll(true)
+    const pagesToImport = parseInt(maxPages) || 5
+    if (pagesToImport < 1 || pagesToImport > 20) {
+      toast.error('Please enter a number between 1 and 20')
+      return
+    }
+
+    setIsImportingMultiple(true)
     let totalImported = 0
     let totalFailed = 0
     let currentPos: string | undefined
     let pageCount = 0
-    const maxPages = 10 // Safety limit
 
     try {
-      while (pageCount < maxPages) {
+      while (pageCount < pagesToImport) {
         const response = await fetch(`/api/admin/import/${activeTab}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -188,7 +194,7 @@ export default function AdminImportPage() {
         totalFailed += data.failed || 0
         pageCount++
 
-        toast.info(`Page ${pageCount}: Imported ${data.imported} GIFs`)
+        toast.info(`Page ${pageCount}/${pagesToImport}: Imported ${data.imported} GIFs`)
 
         // Check if there are more pages
         if (!data.hasNextPage || !data.nextPos) {
@@ -202,7 +208,7 @@ export default function AdminImportPage() {
     } catch {
       toast.error('Import failed')
     } finally {
-      setIsImportingAll(false)
+      setIsImportingMultiple(false)
     }
   }
 
@@ -319,37 +325,58 @@ export default function AdminImportPage() {
                       </div>
                     </div>
 
-                    {/* Import buttons - Stack on mobile */}
+                    {/* Import controls */}
                     {previews.length > 0 && (
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <Button
-                          onClick={handleImport}
-                          disabled={isImporting || isImportingAll || !searchQuery.trim()}
-                          variant="default"
-                          className="flex-1 sm:flex-none h-10 sm:h-9 bg-primary"
-                        >
-                          {isImporting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Download className="h-4 w-4" />
-                          )}
-                          <span className="ml-2">Import Page ({previews.length})</span>
-                        </Button>
-                        {pagination.hasNextPage && (
+                      <div className="space-y-3">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <Button
-                            onClick={handleImportAllPages}
-                            disabled={isImporting || isImportingAll || !searchQuery.trim()}
-                            variant="secondary"
-                            className="flex-1 sm:flex-none h-10 sm:h-9"
+                            onClick={handleImport}
+                            disabled={isImporting || isImportingMultiple || !searchQuery.trim()}
+                            variant="default"
+                            className="flex-1 sm:flex-none h-10 sm:h-9 bg-primary"
                           >
-                            {isImportingAll ? (
+                            {isImporting ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <ChevronsRight className="h-4 w-4" />
+                              <Download className="h-4 w-4" />
                             )}
-                            <span className="ml-2">Import All Pages</span>
+                            <span className="ml-2">Import Page ({previews.length})</span>
                           </Button>
-                        )}
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                          <div className="flex-1 flex gap-2 w-full sm:w-auto">
+                            <div className="flex-1 sm:flex-none sm:w-24">
+                              <Label htmlFor="maxPages" className="sr-only">Max Pages</Label>
+                              <Select
+                                id="maxPages"
+                                value={maxPages}
+                                onChange={(e) => setMaxPages(e.target.value)}
+                                className="h-10 sm:h-9"
+                              >
+                                <option value="1">1 page</option>
+                                <option value="2">2 pages</option>
+                                <option value="3">3 pages</option>
+                                <option value="5">5 pages</option>
+                                <option value="10">10 pages</option>
+                                <option value="20">20 pages</option>
+                              </Select>
+                            </div>
+                            <Button
+                              onClick={handleImportMultiplePages}
+                              disabled={isImporting || isImportingMultiple || !searchQuery.trim()}
+                              variant="secondary"
+                              className="flex-1 sm:flex-none h-10 sm:h-9"
+                            >
+                              {isImportingMultiple ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ChevronsRight className="h-4 w-4" />
+                              )}
+                              <span className="ml-2">Import Multiple Pages</span>
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     )}
 
@@ -374,7 +401,7 @@ export default function AdminImportPage() {
                       <GifGrid previews={previews} isLoading={isSearching} />
                     </TabsContent>
 
-                    {/* Pagination controls - Forward-only navigation */}
+                    {/* Pagination controls */}
                     {pagination.hasNextPage && (
                       <div className="flex items-center justify-center gap-2 pt-4">
                         <Button

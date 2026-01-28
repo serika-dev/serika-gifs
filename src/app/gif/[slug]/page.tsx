@@ -92,33 +92,33 @@ export default async function GifPage({
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
         <div className="grid gap-4 sm:gap-6 lg:gap-8 lg:grid-cols-3">
           {/* GIF Display */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 order-1 lg:order-1">
             <GifViewer gif={gif} />
           </div>
 
-          {/* Sidebar - becomes full-width on mobile */}
-          <div className="space-y-4 sm:space-y-6">
+          {/* Sidebar - becomes full-width on mobile, appears below GIF */}
+          <div className="space-y-3 sm:space-y-4 lg:space-y-6 order-2 lg:order-2">
             {/* Title and Description */}
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold mb-2">{gif.title}</h1>
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold mb-1.5 sm:mb-2 leading-tight">{gif.title}</h1>
               {gif.description && (
-                <p className="text-sm sm:text-base text-muted-foreground">{gif.description}</p>
+                <p className="text-xs sm:text-sm lg:text-base text-muted-foreground leading-relaxed">{gif.description}</p>
               )}
             </div>
 
             {/* User Info */}
-            <Link href={`/user/${gif.user.username}`} className="flex items-center gap-3 group">
-              <Avatar className="h-9 w-9 sm:h-10 sm:w-10">
+            <Link href={`/user/${gif.user.username}`} className="flex items-center gap-2.5 sm:gap-3 group">
+              <Avatar className="h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 shrink-0">
                 <AvatarImage src={gif.user.avatar || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                <AvatarFallback className="bg-primary/10 text-primary text-xs sm:text-sm">
                   {gif.user.username.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <p className="font-medium text-sm sm:text-base group-hover:text-primary transition-colors">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-xs sm:text-sm lg:text-base group-hover:text-primary transition-colors truncate">
                   {gif.user.username}
                 </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">
+                <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground truncate">
                   {formatDistanceToNow(new Date(gif.createdAt), { addSuffix: true })}
                 </p>
               </div>
@@ -127,22 +127,22 @@ export default async function GifPage({
             <Separator />
 
             {/* Stats */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span>{gif.views.toLocaleString()} views</span>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:gap-4">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs lg:text-sm text-muted-foreground">
+                <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 shrink-0" />
+                <span className="truncate">{gif.views.toLocaleString()} views</span>
               </div>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Heart className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span>{gif.favorites.toLocaleString()} favorites</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs lg:text-sm text-muted-foreground">
+                <Heart className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 shrink-0" />
+                <span className="truncate">{gif.favorites.toLocaleString()} favorites</span>
               </div>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Maximize className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span>{gif.width} × {gif.height}</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs lg:text-sm text-muted-foreground">
+                <Maximize className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 shrink-0" />
+                <span className="truncate">{gif.width} × {gif.height}</span>
               </div>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <FileType className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span>{formatBytes(gif.fileSize)}</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs lg:text-sm text-muted-foreground">
+                <FileType className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 shrink-0" />
+                <span className="truncate">{formatBytes(gif.fileSize)}</span>
               </div>
             </div>
 
@@ -151,13 +151,13 @@ export default async function GifPage({
               <>
                 <Separator />
                 <div>
-                  <h3 className="text-xs sm:text-sm font-medium mb-2 sm:mb-3">Tags</h3>
+                  <h3 className="text-xs sm:text-sm lg:text-base font-medium mb-2 sm:mb-2.5">Tags</h3>
                   <div className="flex flex-wrap gap-1.5 sm:gap-2">
                     {gif.tags.map((tag) => (
                       <Link key={tag.slug} href={`/tag/${tag.slug}`}>
                         <Badge
                           variant="secondary"
-                          className="cursor-pointer hover:bg-primary/20 active:bg-primary/30 transition-colors text-xs sm:text-sm"
+                          className="cursor-pointer hover:bg-primary/20 active:bg-primary/30 transition-colors text-[10px] sm:text-xs lg:text-sm px-2 py-0.5 sm:px-2.5 sm:py-1"
                         >
                           {tag.name}
                         </Badge>
@@ -173,15 +173,15 @@ export default async function GifPage({
               <>
                 <Separator />
                 <div>
-                  <h3 className="text-xs sm:text-sm font-medium mb-1 sm:mb-2">Source</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
+                  <h3 className="text-xs sm:text-sm lg:text-base font-medium mb-1 sm:mb-1.5">Source</h3>
+                  <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground">
                     Imported from {gif.source.toLowerCase()}
                   </p>
                   <a
                     href={gif.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs sm:text-sm text-primary hover:underline"
+                    className="text-[10px] sm:text-xs lg:text-sm text-primary hover:underline break-all"
                   >
                     View original
                   </a>
