@@ -4,13 +4,40 @@ import { requireAdmin } from '@/lib/session'
 import { uploadToB2 } from '@/lib/storage'
 import { nanoid } from 'nanoid'
 
-// Tenor API integration
-async function searchTenor(query: string, limit: number = 20) {
+interface TenorSearchResult {
+  results: TenorGif[]
+  next: string
+}
+
+interface TenorGif {
+  id: string
+  content_description: string
+  url: string
+  media_formats: {
+    gif?: { url: string; dims: number[] }
+    mediumgif?: { url: string }
+    tinygif?: { url: string }
+  }
+}
+
+// Tenor API integration with pagination
+async function searchTenor(query: string, limit: number = 20, pos?: string): Promise<TenorSearchResult> {
   const apiKey = process.env.TENOR_API_KEY
   if (!apiKey) throw new Error('TENOR_API_KEY not configured')
 
+  const params = new URLSearchParams({
+    q: query,
+    key: apiKey,
+    limit: limit.toString(),
+    media_filter: 'gif',
+  })
+  
+  if (pos) {
+    params.set('pos', pos)
+  }
+
   const response = await fetch(
-    `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${apiKey}&limit=${limit}&media_filter=gif`
+    `https://tenor.googleapis.com/v2/search?${params}`
   )
 
   if (!response.ok) {
@@ -18,7 +45,10 @@ async function searchTenor(query: string, limit: number = 20) {
   }
 
   const data = await response.json()
-  return data.results
+  return {
+    results: data.results || [],
+    next: data.next || '',
+  }
 }
 
 // POST /api/admin/import/tenor - Import from Tenor
@@ -26,7 +56,7 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await requireAdmin()
 
-    const { query, limit = 20 } = await request.json()
+    const { query, limit = 20, pos } = await request.json()
 
     if (!query) {
       return NextResponse.json(
@@ -45,7 +75,7 @@ export async function POST(request: NextRequest) {
     })
 
     try {
-      const results = await searchTenor(query, limit)
+      const { results, next } = await searchTenor(query, limit, pos)
       
       await prisma.importJob.update({
         where: { id: importJob.id },
@@ -70,12 +100,13 @@ export async function POST(request: NextRequest) {
           }
 
           const gifUrl = result.media_formats?.gif?.url || result.media_formats?.mediumgif?.url
-          const previewUrl = result.media_formats?.tinygif?.url
 
           if (!gifUrl) {
             failed++
             continue
           }
+
+          const previewUrl = result.media_formats?.tinygif?.url
 
           // Download and re-upload to B2
           const gifResponse = await fetch(gifUrl)
@@ -134,29 +165,33 @@ export async function POST(request: NextRequest) {
         failed,
         total: results.length,
         jobId: importJob.id,
+        hasNextPage: !!next,
+        nextPos: next || null,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       await prisma.importJob.update({
         where: { id: importJob.id },
         data: {
           status: 'FAILED',
-          error: error.message,
+          error: errorMessage,
         },
       })
       throw error
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Tenor import error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Import failed'
     
-    if (error.message === 'Unauthorized' || error.message === 'Admin access required') {
+    if (errorMessage === 'Unauthorized' || errorMessage === 'Admin access required') {
       return NextResponse.json(
-        { error: error.message },
+        { error: errorMessage },
         { status: 403 }
       )
     }
 
     return NextResponse.json(
-      { error: error.message || 'Import failed' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
@@ -170,6 +205,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('query')
     const limit = parseInt(searchParams.get('limit') || '20')
+    const pos = searchParams.get('pos') || undefined
 
     if (!query) {
       return NextResponse.json(
@@ -178,27 +214,32 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const results = await searchTenor(query, limit)
+    const { results, next } = await searchTenor(query, limit, pos)
 
     return NextResponse.json({
-      results: results.map((r: any) => ({
+      results: results.map((r) => ({
         id: r.id,
         title: r.content_description,
         url: r.media_formats?.gif?.url || r.media_formats?.mediumgif?.url,
         preview: r.media_formats?.tinygif?.url,
         sourceUrl: r.url,
       })),
+      totalCount: results.length,
+      hasNextPage: !!next,
+      nextPos: next || null,
     })
-  } catch (error: any) {
-    if (error.message === 'Unauthorized' || error.message === 'Admin access required') {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Search failed'
+    
+    if (errorMessage === 'Unauthorized' || errorMessage === 'Admin access required') {
       return NextResponse.json(
-        { error: error.message },
+        { error: errorMessage },
         { status: 403 }
       )
     }
 
     return NextResponse.json(
-      { error: error.message || 'Search failed' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

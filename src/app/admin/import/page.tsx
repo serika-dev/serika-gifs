@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -15,10 +15,15 @@ import {
   CheckCircle, 
   XCircle,
   Image as ImageIcon,
-  History
+  History,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  RefreshCw
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface GifPreview {
   id: string
@@ -40,28 +45,52 @@ interface ImportJob {
   completedAt?: string
 }
 
+interface PaginationInfo {
+  currentPage: number
+  totalCount: number
+  hasNextPage: boolean
+  nextPos?: string
+}
+
 export default function AdminImportPage() {
   const [activeTab, setActiveTab] = useState('tenor')
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [isImportingAll, setIsImportingAll] = useState(false)
   const [previews, setPreviews] = useState<GifPreview[]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [importJobs, setImportJobs] = useState<ImportJob[]>([])
   const [isLoadingJobs, setIsLoadingJobs] = useState(false)
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    currentPage: 1,
+    totalCount: 0,
+    hasNextPage: false,
+  })
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async (resetPage: boolean = true, pos?: string) => {
     if (!searchQuery.trim()) {
       toast.error('Please enter a search query')
       return
     }
 
     setIsSearching(true)
-    setPreviews([])
-    setSelectedIds(new Set())
+    
+    // Reset on new search
+    const pageNum = resetPage ? 1 : pagination.currentPage + 1
+    if (resetPage) {
+      setPreviews([])
+    }
 
     try {
-      const response = await fetch(`/api/admin/import/${activeTab}?query=${encodeURIComponent(searchQuery)}&limit=20`)
+      const params = new URLSearchParams({
+        query: searchQuery,
+        limit: '20',
+      })
+      if (pos) {
+        params.set('pos', pos)
+      }
+
+      const response = await fetch(`/api/admin/import/${activeTab}?${params}`)
       const data = await response.json()
 
       if (data.error) {
@@ -70,6 +99,12 @@ export default function AdminImportPage() {
       }
 
       setPreviews(data.results || [])
+      setPagination({
+        currentPage: pageNum,
+        totalCount: data.totalCount || data.results?.length || 0,
+        hasNextPage: data.hasNextPage || false,
+        nextPos: data.nextPos,
+      })
       
       if (data.results?.length === 0) {
         toast.info('No results found')
@@ -79,7 +114,7 @@ export default function AdminImportPage() {
     } finally {
       setIsSearching(false)
     }
-  }
+  }, [searchQuery, activeTab, pagination.currentPage])
 
   const handleImport = async () => {
     if (!searchQuery.trim()) {
@@ -90,10 +125,15 @@ export default function AdminImportPage() {
     setIsImporting(true)
 
     try {
+      // Import the currently displayed results by re-fetching with the same query
+      // Note: This re-searches and imports - it doesn't use cached results
       const response = await fetch(`/api/admin/import/${activeTab}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery, limit: 20 }),
+        body: JSON.stringify({ 
+          query: searchQuery, 
+          limit: 20,
+        }),
       })
       
       const data = await response.json()
@@ -104,13 +144,65 @@ export default function AdminImportPage() {
       }
 
       toast.success(`Imported ${data.imported} GIFs (${data.failed} failed)`)
-      setPreviews([])
-      setSelectedIds(new Set())
       loadImportJobs()
     } catch {
       toast.error('Import failed')
     } finally {
       setIsImporting(false)
+    }
+  }
+
+  const handleImportAllPages = async () => {
+    if (!searchQuery.trim()) {
+      toast.error('Please enter a search query')
+      return
+    }
+
+    setIsImportingAll(true)
+    let totalImported = 0
+    let totalFailed = 0
+    let currentPos: string | undefined
+    let pageCount = 0
+    const maxPages = 10 // Safety limit
+
+    try {
+      while (pageCount < maxPages) {
+        const response = await fetch(`/api/admin/import/${activeTab}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            query: searchQuery, 
+            limit: 50,
+            pos: currentPos 
+          }),
+        })
+        
+        const data = await response.json()
+
+        if (data.error) {
+          toast.error(data.error)
+          break
+        }
+
+        totalImported += data.imported || 0
+        totalFailed += data.failed || 0
+        pageCount++
+
+        toast.info(`Page ${pageCount}: Imported ${data.imported} GIFs`)
+
+        // Check if there are more pages
+        if (!data.hasNextPage || !data.nextPos) {
+          break
+        }
+        currentPos = data.nextPos
+      }
+
+      toast.success(`Total: Imported ${totalImported} GIFs (${totalFailed} failed) from ${pageCount} pages`)
+      loadImportJobs()
+    } catch {
+      toast.error('Import failed')
+    } finally {
+      setIsImportingAll(false)
     }
   }
 
@@ -127,14 +219,15 @@ export default function AdminImportPage() {
     }
   }
 
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selectedIds)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
+  // Load jobs on mount
+  useEffect(() => {
+    loadImportJobs()
+  }, [])
+
+  const loadNextPage = () => {
+    if (pagination.hasNextPage && pagination.nextPos) {
+      handleSearch(false, pagination.nextPos)
     }
-    setSelectedIds(newSelected)
   }
 
   const getSourceLabel = (source: string) => {
@@ -157,38 +250,48 @@ export default function AdminImportPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 px-4">
-        <div className="flex items-center justify-between mb-8">
+      <div className="container mx-auto py-4 sm:py-8 px-3 sm:px-4">
+        {/* Header - Mobile optimized */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Import GIFs</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold">Import GIFs</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
               Import GIFs from external sources
             </p>
           </div>
           <Link href="/admin">
-            <Button variant="outline">Back to Admin</Button>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto">
+              Back to Admin
+            </Button>
           </Link>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid gap-6 lg:gap-8 lg:grid-cols-3">
+          {/* Main content - Full width on mobile */}
+          <div className="lg:col-span-2 order-1">
             <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle>Search & Import</CardTitle>
-                <CardDescription>
+              <CardHeader className="px-4 sm:px-6">
+                <CardTitle className="text-lg sm:text-xl">Search & Import</CardTitle>
+                <CardDescription className="text-sm">
                   Search for GIFs and import them to your library
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-3 mb-6">
-                    <TabsTrigger value="tenor">Tenor</TabsTrigger>
-                    <TabsTrigger value="giphy">Giphy</TabsTrigger>
-                    <TabsTrigger value="klipy">Klipy</TabsTrigger>
+              <CardContent className="px-4 sm:px-6">
+                <Tabs value={activeTab} onValueChange={(tab) => {
+                  setActiveTab(tab)
+                  setPreviews([])
+                  setSearchQuery('')
+                  setPagination({ currentPage: 1, totalCount: 0, hasNextPage: false })
+                }}>
+                  <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6 h-auto">
+                    <TabsTrigger value="tenor" className="text-xs sm:text-sm py-2 sm:py-1.5">Tenor</TabsTrigger>
+                    <TabsTrigger value="giphy" className="text-xs sm:text-sm py-2 sm:py-1.5">Giphy</TabsTrigger>
+                    <TabsTrigger value="klipy" className="text-xs sm:text-sm py-2 sm:py-1.5">Klipy</TabsTrigger>
                   </TabsList>
 
                   <div className="space-y-4">
-                    <div className="flex gap-2">
+                    {/* Search controls - Stack on mobile */}
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <div className="flex-1">
                         <Label htmlFor="search" className="sr-only">Search</Label>
                         <Input
@@ -196,35 +299,70 @@ export default function AdminImportPage() {
                           placeholder={`Search ${getSourceLabel(activeTab)} for GIFs...`}
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                          className="bg-background/50"
+                          onKeyDown={(e) => e.key === 'Enter' && handleSearch(true)}
+                          className="bg-background/50 h-10 sm:h-9"
                         />
                       </div>
-                      <Button
-                        onClick={handleSearch}
-                        disabled={isSearching}
-                      >
-                        {isSearching ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Search className="h-4 w-4" />
-                        )}
-                        <span className="ml-2">Search</span>
-                      </Button>
-                      <Button
-                        onClick={handleImport}
-                        disabled={isImporting || !searchQuery.trim()}
-                        variant="default"
-                        className="bg-primary"
-                      >
-                        {isImporting ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4" />
-                        )}
-                        <span className="ml-2">Import All</span>
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleSearch(true)}
+                          disabled={isSearching}
+                          className="flex-1 sm:flex-none h-10 sm:h-9"
+                        >
+                          {isSearching ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Search className="h-4 w-4" />
+                          )}
+                          <span className="ml-2">Search</span>
+                        </Button>
+                      </div>
                     </div>
+
+                    {/* Import buttons - Stack on mobile */}
+                    {previews.length > 0 && (
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          onClick={handleImport}
+                          disabled={isImporting || isImportingAll || !searchQuery.trim()}
+                          variant="default"
+                          className="flex-1 sm:flex-none h-10 sm:h-9 bg-primary"
+                        >
+                          {isImporting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4" />
+                          )}
+                          <span className="ml-2">Import Page ({previews.length})</span>
+                        </Button>
+                        {pagination.hasNextPage && (
+                          <Button
+                            onClick={handleImportAllPages}
+                            disabled={isImporting || isImportingAll || !searchQuery.trim()}
+                            variant="secondary"
+                            className="flex-1 sm:flex-none h-10 sm:h-9"
+                          >
+                            {isImportingAll ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ChevronsRight className="h-4 w-4" />
+                            )}
+                            <span className="ml-2">Import All Pages</span>
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Results info */}
+                    {previews.length > 0 && (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm text-muted-foreground">
+                        <span>
+                          Showing {previews.length} results
+                          {pagination.totalCount > previews.length && ` (more available)`}
+                        </span>
+                        <span>Page {pagination.currentPage}</span>
+                      </div>
+                    )}
 
                     <TabsContent value="tenor" className="mt-0">
                       <GifGrid previews={previews} isLoading={isSearching} />
@@ -235,18 +373,46 @@ export default function AdminImportPage() {
                     <TabsContent value="klipy" className="mt-0">
                       <GifGrid previews={previews} isLoading={isSearching} />
                     </TabsContent>
+
+                    {/* Pagination controls - Forward-only navigation */}
+                    {pagination.hasNextPage && (
+                      <div className="flex items-center justify-center gap-2 pt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => handleSearch(true)}
+                          disabled={isSearching}
+                          className="h-9"
+                        >
+                          <ChevronsLeft className="h-4 w-4 mr-2" />
+                          Back to First
+                        </Button>
+                        <span className="px-3 py-2 text-sm font-medium">
+                          Page {pagination.currentPage}
+                        </span>
+                        <Button
+                          variant="outline"
+                          onClick={loadNextPage}
+                          disabled={!pagination.hasNextPage || isSearching}
+                          className="h-9"
+                        >
+                          Next Page
+                          <ChevronRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Tabs>
               </CardContent>
             </Card>
           </div>
 
-          <div>
+          {/* Sidebar - Full width on mobile, below main content */}
+          <div className="order-2">
             <Card className="border-border/50">
-              <CardHeader>
+              <CardHeader className="px-4 sm:px-6">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <History className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <History className="h-4 w-4 sm:h-5 sm:w-5" />
                     Recent Imports
                   </CardTitle>
                   <Button
@@ -254,16 +420,18 @@ export default function AdminImportPage() {
                     size="sm"
                     onClick={loadImportJobs}
                     disabled={isLoadingJobs}
+                    className="h-8 px-2 sm:px-3"
                   >
                     {isLoadingJobs ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      'Refresh'
+                      <RefreshCw className="h-4 w-4" />
                     )}
+                    <span className="ml-1.5 hidden sm:inline">Refresh</span>
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 sm:px-6">
                 <div className="space-y-3">
                   {isLoadingJobs ? (
                     Array.from({ length: 3 }).map((_, i) => (
@@ -279,14 +447,14 @@ export default function AdminImportPage() {
                         key={job.id}
                         className="p-3 rounded-lg border border-border/50 bg-card/50"
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <Badge variant="outline">{job.source}</Badge>
-                          <Badge className={getStatusColor(job.status)}>
+                        <div className="flex items-center justify-between mb-2 gap-2">
+                          <Badge variant="outline" className="text-xs">{job.source}</Badge>
+                          <Badge className={`text-xs ${getStatusColor(job.status)}`}>
                             {job.status}
                           </Badge>
                         </div>
                         <p className="text-sm font-medium truncate">{job.query}</p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-3 sm:gap-4 mt-2 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <CheckCircle className="h-3 w-3 text-green-500" />
                             {job.importedItems}
@@ -313,7 +481,7 @@ export default function AdminImportPage() {
 function GifGrid({ previews, isLoading }: { previews: GifPreview[], isLoading: boolean }) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
         {Array.from({ length: 8 }).map((_, i) => (
           <Skeleton key={i} className="aspect-square rounded-lg" />
         ))}
@@ -323,27 +491,29 @@ function GifGrid({ previews, isLoading }: { previews: GifPreview[], isLoading: b
 
   if (previews.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-        <ImageIcon className="h-12 w-12 mb-4 opacity-50" />
-        <p>Search for GIFs to preview them here</p>
+      <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-muted-foreground">
+        <ImageIcon className="h-10 w-10 sm:h-12 sm:w-12 mb-4 opacity-50" />
+        <p className="text-sm sm:text-base text-center px-4">Search for GIFs to preview them here</p>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
       {previews.map((gif) => (
         <div
           key={gif.id}
           className="relative aspect-square rounded-lg overflow-hidden border border-border/50 bg-muted group cursor-pointer"
         >
-          <img
+          <Image
             src={gif.preview || gif.url}
-            alt={gif.title}
-            className="w-full h-full object-cover"
-            loading="lazy"
+            alt={gif.title || 'Animated GIF preview'}
+            fill
+            className="object-cover"
+            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+            unoptimized
           />
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 sm:transition-opacity flex items-end p-2">
             <p className="text-xs text-white truncate">{gif.title}</p>
           </div>
         </div>
