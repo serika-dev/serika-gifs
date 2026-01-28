@@ -21,6 +21,8 @@ interface GifGridProps {
   tag?: string
   userId?: string
   source?: string
+  sort?: 'trending' | 'newest' | 'popular' | 'most-viewed'
+  timeRange?: 'day' | 'week' | 'month' | 'all'
   emptyMessage?: string
   emptySubMessage?: string
   columns?: 'default' | 'compact' | 'wide'
@@ -32,6 +34,8 @@ export function GifGrid({
   tag, 
   userId, 
   source,
+  sort = 'newest',
+  timeRange = 'all',
   emptyMessage = 'No GIFs found',
   emptySubMessage = 'Try a different search or upload some GIFs!',
   columns = 'default',
@@ -61,6 +65,8 @@ export function GifGrid({
       if (tag) params.set('tag', tag)
       if (userId) params.set('userId', userId)
       if (source) params.set('source', source)
+      if (sort) params.set('sort', sort)
+      if (timeRange) params.set('timeRange', timeRange)
 
       const response = await fetch(`/api/gifs?${params}`)
       const data = await response.json()
@@ -75,13 +81,13 @@ export function GifGrid({
     } finally {
       setIsLoading(false)
     }
-  }, [search, tag, userId, source])
+  }, [search, tag, userId, source, sort, timeRange])
 
+  // Reset to page 1 and refetch when filters change
   useEffect(() => {
-    if (!initialGifs) {
-      fetchGifs(1)
-    }
-  }, [fetchGifs, initialGifs])
+    setPage(1)
+    fetchGifs(1)
+  }, [search, tag, userId, source, sort, timeRange])
 
   const goToPage = (pageNum: number) => {
     setPage(pageNum)

@@ -23,6 +23,7 @@ interface KlipyGif {
   source_url?: string
   width?: number
   height?: number
+  tags?: string[]
   media?: {
     gif?: string
     thumbnail?: string
@@ -113,6 +114,8 @@ export async function POST(request: NextRequest) {
           width: result.width || 0,
           height: result.height || 0,
           source: 'KLIPY' as const,
+          // Use Klipy's tags if available
+          sourceTags: result.tags || [],
         }))
 
       const skippedDuplicates = results.length - gifsToImport.length

@@ -16,11 +16,35 @@ export async function GET(request: NextRequest) {
     const tag = searchParams.get('tag') || ''
     const userId = searchParams.get('userId') || ''
     const source = searchParams.get('source') || ''
+    const sort = searchParams.get('sort') || 'newest'
+    const timeRange = searchParams.get('timeRange') || 'all'
 
     const skip = (page - 1) * limit
 
     const where: any = {
       isPublic: true,
+    }
+
+    // Time range filter
+    if (timeRange !== 'all') {
+      const now = new Date()
+      let startDate: Date
+      
+      switch (timeRange) {
+        case 'day':
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+          break
+        case 'week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          break
+        case 'month':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          break
+        default:
+          startDate = new Date(0)
+      }
+      
+      where.createdAt = { gte: startDate }
     }
 
     if (search) {
@@ -42,6 +66,26 @@ export async function GET(request: NextRequest) {
 
     if (userId) {
       where.userId = userId
+    }
+
+    // Determine sort order
+    let orderBy: any
+    switch (sort) {
+      case 'trending':
+        // Trending = combination of recent views and favorites
+        // For now, use views as proxy, weighted by recency
+        orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
+        break
+      case 'popular':
+        // Most favorited
+        orderBy = { favorites: { _count: 'desc' } }
+        break
+      case 'most-viewed':
+        orderBy = { views: 'desc' }
+        break
+      case 'newest':
+      default:
+        orderBy = { createdAt: 'desc' }
     }
 
     // Source filtering removed - all GIFs treated equally
@@ -68,7 +112,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take: limit,
       }),

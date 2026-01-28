@@ -14,8 +14,10 @@ interface TenorSearchResult {
 
 interface TenorGif {
   id: string
+  title?: string
   content_description: string
   url: string
+  tags?: string[]
   media_formats: {
     gif?: { url: string; dims: number[] }
     mediumgif?: { url: string }
@@ -99,13 +101,15 @@ export async function POST(request: NextRequest) {
           const dimensions = result.media_formats?.gif?.dims || [0, 0]
           return {
             sourceId: result.id,
-            title: result.content_description || query,
+            title: result.title || result.content_description || query,
             gifUrl: result.media_formats?.gif?.url || result.media_formats?.mediumgif?.url || '',
             previewUrl: result.media_formats?.tinygif?.url,
             sourceUrl: result.url,
             width: dimensions[0] || 0,
             height: dimensions[1] || 0,
             source: 'TENOR' as const,
+            // Use Tenor's tags array directly (these are proper curated tags)
+            sourceTags: result.tags || [],
           }
         })
 

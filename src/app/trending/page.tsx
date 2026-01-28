@@ -152,6 +152,8 @@ export default function TrendingPage() {
 
         {/* GIF Grid */}
         <GifGrid 
+          sort={sort}
+          timeRange={timeRange}
           emptyMessage="No GIFs found"
           emptySubMessage="Check back later for new content!"
         />

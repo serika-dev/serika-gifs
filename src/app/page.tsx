@@ -96,14 +96,14 @@ export default async function HomePage() {
       {/* GIF Grid */}
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold">Latest GIFs</h2>
+          <h2 className="text-xl sm:text-2xl font-bold">Popular GIFs</h2>
           <Link href="/trending">
             <Button variant="ghost" size="sm" className="h-8 sm:h-9 text-sm">
               View all
             </Button>
           </Link>
         </div>
-        <GifGrid />
+        <GifGrid sort="most-viewed" />
       </main>
 
       {/* Footer */}

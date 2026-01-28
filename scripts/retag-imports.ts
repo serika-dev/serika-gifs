@@ -1,121 +1,159 @@
 #!/usr/bin/env bun
 /**
- * Retag Imports Script
+ * Retag Imports Script (API-based)
  * 
- * This script completely re-tags all imported GIFs by:
- * 1. Wiping all existing tags (except keeping 'import' tag)
- * 2. Extracting better tags from title and slug using smarter parsing
+ * This script completely re-tags all imported GIFs by fetching tags from the source APIs:
+ * - Tenor: Uses the `tags` array returned by the API
+ * - Giphy: Extracts tags from the slug (e.g., "confused-flying-YsTs5ltWtEhnq" -> ["confused", "flying"])
+ * - Klipy: Uses tags from API if available
  * 
- * For Giphy: Tags are extracted from the slug (e.g., "confused-flying-YsTs5ltWtEhnq" -> ["confused", "flying"])
- * For Tenor: Tags are extracted from the content_description stored in title
- * For Klipy: Tags are extracted from title
+ * The script batches API requests to avoid rate limiting and handles errors gracefully.
  * 
  * Usage:
- *   bun run scripts/retag-imports.ts [--dry-run] [--source=TENOR|GIPHY|KLIPY] [--limit=100]
+ *   bun run scripts/retag-imports.ts [--dry-run] [--source=TENOR|GIPHY|KLIPY] [--limit=100] [--concurrency=5]
  * 
  * Options:
- *   --dry-run         Show what would be done without actually doing it
- *   --source=SOURCE   Only process GIFs from a specific source
- *   --limit=N         Maximum number of GIFs to process (default: all)
- *   --verbose         Show detailed information about each GIF
- *   --keep-existing   Don't wipe existing tags, only add new ones
+ *   --dry-run            Show what would be done without actually doing it
+ *   --source=SOURCE      Only process GIFs from a specific source
+ *   --limit=N            Maximum number of GIFs to process (default: all)
+ *   --concurrency=N      Number of concurrent API requests (default: 5)
+ *   --verbose            Show detailed information about each GIF
+ *   --keep-existing      Don't wipe existing tags, only add new ones
  */
 
 import { PrismaClient } from '@prisma/client'
+import 'dotenv/config'
 
 const prisma = new PrismaClient()
 
-// Stop words to exclude from tags
-const STOP_WORDS = new Set([
-  // Common words
-  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'have', 'has',
-  'are', 'was', 'were', 'been', 'being', 'will', 'would', 'could', 'should',
-  'may', 'might', 'must', 'shall', 'can', 'need', 'into', 'about',
-  'when', 'you', 'your', 'they', 'them', 'their', 'what', 'where', 'which',
-  'who', 'whom', 'how', 'why', 'all', 'each', 'every', 'both', 'few', 'more',
-  'some', 'any', 'most', 'other', 'such', 'only', 'own', 'same', 'than',
-  'too', 'very', 'just', 'but', 'now', 'also', 'well', 'back', 'even',
-  'new', 'want', 'way', 'look', 'use', 'day', 'good', 'first', 'last',
-  'long', 'great', 'little', 'old', 'right', 'big', 'high', 'small',
-  'his', 'her', 'its', 'our', 'out', 'one', 'two', 'three',
-  // Prepositions and articles
-  'a', 'an', 'of', 'on', 'in', 'to', 'at', 'by', 'up', 'is', 'it',
-  'as', 'or', 'if', 'so', 'be', 'do', 'go', 'no', 'my', 'me', 'he', 'we',
-  // GIF-specific stop words
-  'gif', 'gifs', 'giphy', 'tenor', 'klipy', 'animated', 'animation',
-  'sticker', 'stickers', 'meme', 'memes', 'reaction', 'reactions',
-  'discover', 'share', 'perfect', 'best', 'top', 'popular', 'trending',
-  'download', 'free', 'hd', 'original', 'source', 'image', 'picture',
-  'video', 'clip', 'watch', 'see', 'find', 'get', 'make', 'made',
-  // Very common reaction words that aren't useful alone
-  'yes', 'no', 'okay', 'ok', 'yeah', 'yep', 'nope',
-  // Common descriptors from image recognition
-  'close', 'front', 'next', 'wearing', 'standing', 'sitting', 'says',
-  'written', 'words', 'above', 'below', 'shows', 'shown',
-])
+// API Keys
+const TENOR_API_KEY = process.env.TENOR_API_KEY
+const GIPHY_API_KEY = process.env.GIPHY_API_KEY
 
-// Known phrases to keep together (these won't be split)
-const KNOWN_PHRASES = [
-  'eye roll', 'side eye', 'thumbs up', 'thumbs down', 'face palm', 'facepalm',
-  'high five', 'slow clap', 'mic drop', 'mind blown', 'deal with it',
-  'shut up', 'come on', 'lets go', 'oh no', 'oh yeah', 'hell yeah',
-  'good morning', 'good night', 'happy birthday', 'thank you', 'thanks',
-]
+interface GifRecord {
+  id: string
+  slug: string
+  title: string
+  source: string
+  sourceId: string | null
+  sourceUrl: string | null
+  _count: { tags: number }
+}
 
-function extractTagsFromText(text: string): Set<string> {
-  const tags = new Set<string>()
+interface TenorResponse {
+  results: Array<{
+    id: string
+    tags?: string[]
+    title?: string
+    content_description?: string
+  }>
+}
+
+interface GiphyResponse {
+  data: {
+    id: string
+    slug: string
+    title?: string
+  }
+}
+
+// ========================================
+// API Functions
+// ========================================
+
+async function fetchTenorTags(sourceIds: string[]): Promise<Map<string, string[]>> {
+  if (!TENOR_API_KEY) {
+    console.warn('⚠️  TENOR_API_KEY not set, skipping Tenor API calls')
+    return new Map()
+  }
+
+  const results = new Map<string, string[]>()
   
-  // Normalize text
-  let normalized = text
-    .toLowerCase()
-    .replace(/[_-]+/g, ' ')  // Replace underscores and hyphens with spaces
-    .replace(/([a-z])([A-Z])/g, '$1 $2')  // Split camelCase
-    .replace(/[^\w\s]/g, ' ')  // Remove special chars
-    .replace(/\s+/g, ' ')  // Normalize spaces
-    .trim()
-  
-  // First, check for known phrases and extract them
-  for (const phrase of KNOWN_PHRASES) {
-    if (normalized.includes(phrase)) {
-      tags.add(phrase.replace(/\s+/g, '-'))
-      normalized = normalized.replace(new RegExp(phrase, 'g'), ' ')
+  // Tenor API allows fetching up to 50 IDs at once
+  const batchSize = 50
+  for (let i = 0; i < sourceIds.length; i += batchSize) {
+    const batch = sourceIds.slice(i, i + batchSize)
+    const ids = batch.join(',')
+    
+    try {
+      const response = await fetch(
+        `https://tenor.googleapis.com/v2/posts?key=${TENOR_API_KEY}&ids=${ids}`
+      )
+      
+      if (!response.ok) {
+        console.warn(`⚠️  Tenor API error: ${response.status}`)
+        continue
+      }
+      
+      const data: TenorResponse = await response.json()
+      
+      for (const result of data.results) {
+        if (result.tags && result.tags.length > 0) {
+          results.set(result.id, result.tags)
+        }
+      }
+      
+      // Small delay between batches
+      if (i + batchSize < sourceIds.length) {
+        await new Promise(r => setTimeout(r, 100))
+      }
+    } catch (error) {
+      console.warn(`⚠️  Tenor API fetch error:`, error)
     }
   }
   
-  // Split remaining text into words
-  const words = normalized
-    .split(/\s+/)
-    .filter(word => {
-      // Must be 2+ chars, not a stop word, and not purely numeric
-      return word.length >= 2 && 
-             !STOP_WORDS.has(word) && 
-             !/^\d+$/.test(word) &&
-             !/^[a-z0-9]{10,}$/i.test(word)  // Skip long ID-like strings
+  return results
+}
+
+async function fetchGiphyTags(sourceId: string): Promise<string[] | null> {
+  if (!GIPHY_API_KEY) {
+    return null
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.giphy.com/v1/gifs/${sourceId}?api_key=${GIPHY_API_KEY}`
+    )
+    
+    if (!response.ok) {
+      return null
+    }
+    
+    const data: GiphyResponse = await response.json()
+    
+    // Extract tags from slug
+    if (data.data?.slug) {
+      return extractTagsFromGiphySlug(data.data.slug, data.data.id)
+    }
+    
+    return null
+  } catch {
+    return null
+  }
+}
+
+function extractTagsFromGiphySlug(slug: string, id: string): string[] {
+  if (!slug) return []
+  
+  // Remove the ID suffix (Giphy slugs end with the ID)
+  const withoutId = slug.replace(new RegExp(`-?${id}$`, 'i'), '')
+  
+  // Split by hyphens and filter
+  return withoutId
+    .split('-')
+    .map(t => t.toLowerCase().trim())
+    .filter(tag => {
+      // Must be 2+ chars, not purely numeric, not too long
+      return tag.length >= 2 && 
+             tag.length <= 30 &&
+             !/^\d+$/.test(tag) &&
+             !/^[a-z0-9]{10,}$/i.test(tag)  // Skip ID-like strings
     })
-  
-  // Add individual words
-  words.forEach(word => {
-    if (word.length >= 2 && word.length <= 30) {
-      tags.add(word)
-    }
-  })
-  
-  return tags
 }
 
-function extractTagsFromGiphySlug(slug: string): Set<string> {
-  // Giphy slugs look like: "confused-flying-YsTs5ltWtEhnq"
-  // The last part is the ID, everything before is the actual tag info
-  const parts = slug.split('-')
-  
-  // Remove the last part if it looks like an ID (alphanumeric, 10+ chars)
-  if (parts.length > 1 && /^[a-zA-Z0-9]{10,}$/.test(parts[parts.length - 1])) {
-    parts.pop()
-  }
-  
-  // Join back and extract tags
-  return extractTagsFromText(parts.join(' '))
-}
+// ========================================
+// Database Functions
+// ========================================
 
 function slugifyTag(name: string): string {
   return name
@@ -134,7 +172,6 @@ async function ensureImportTag(): Promise<string> {
 }
 
 async function wipeTagsForGif(gifId: string, importTagId: string): Promise<number> {
-  // Delete all tags except 'import'
   const result = await prisma.tagOnGif.deleteMany({
     where: {
       gifId,
@@ -144,24 +181,21 @@ async function wipeTagsForGif(gifId: string, importTagId: string): Promise<numbe
   return result.count
 }
 
-async function createAndLinkTags(gifId: string, tagNames: Set<string>, importTagId: string): Promise<number> {
-  if (tagNames.size === 0) return 0
+async function createAndLinkTags(
+  gifId: string, 
+  tagNames: string[], 
+  importTagId: string
+): Promise<number> {
+  if (tagNames.length === 0) return 0
   
   let linked = 0
-  const tagArray = Array.from(tagNames).slice(0, 15) // Allow up to 15 tags per GIF
-  
-  interface TagRecord {
-    id: string
-    name: string
-    slug: string
-    createdAt: Date
-  }
+  const tagArray = tagNames.slice(0, 15) // Allow up to 15 tags per GIF
   
   // Batch upsert tags
-  const tags: (TagRecord | null)[] = await Promise.all(
-    tagArray.map(async (name): Promise<TagRecord | null> => {
+  const tags = await Promise.all(
+    tagArray.map(async (name) => {
       const slug = slugifyTag(name)
-      if (!slug || slug === 'import') return null  // Skip 'import' tag, we handle it separately
+      if (!slug || slug === 'import') return null
       
       try {
         return await prisma.tag.upsert({
@@ -170,15 +204,14 @@ async function createAndLinkTags(gifId: string, tagNames: Set<string>, importTag
           create: { name, slug },
         })
       } catch {
-        // Race condition - tag already exists
         return prisma.tag.findUnique({ where: { slug } })
       }
     })
   )
   
-  // Batch create tag links using createMany with skipDuplicates
-  const validTags = tags.filter((t): t is TagRecord => t !== null)
-  const tagLinks = validTags.map((tag: TagRecord) => ({
+  // Build tag links
+  const validTags = tags.filter(t => t !== null)
+  const tagLinks = validTags.map(tag => ({
     gifId,
     tagId: tag.id,
   }))
@@ -197,22 +230,225 @@ async function createAndLinkTags(gifId: string, tagNames: Set<string>, importTag
   return linked
 }
 
+// ========================================
+// Main Script
+// ========================================
+
+async function processGifsInBatches(
+  gifs: GifRecord[],
+  options: {
+    dryRun: boolean
+    verbose: boolean
+    keepExisting: boolean
+    concurrency: number
+    importTagId: string
+  }
+): Promise<{
+  processed: number
+  tagsWiped: number
+  tagsAdded: number
+  tagCounts: Record<string, number>
+}> {
+  let processed = 0
+  let tagsWiped = 0
+  let tagsAdded = 0
+  const tagCounts: Record<string, number> = {}
+
+  // Group GIFs by source for batch API calls
+  const tenorGifs = gifs.filter(g => g.source === 'TENOR' && g.sourceId)
+  const giphyGifs = gifs.filter(g => g.source === 'GIPHY' && g.sourceId)
+  const klipyGifs = gifs.filter(g => g.source === 'KLIPY')
+
+  console.log(`\n📊 Distribution: Tenor: ${tenorGifs.length}, Giphy: ${giphyGifs.length}, Klipy: ${klipyGifs.length}`)
+
+  // ========================================
+  // Process Tenor GIFs (batch API calls)
+  // ========================================
+  if (tenorGifs.length > 0) {
+    console.log(`\n🎵 Fetching tags for ${tenorGifs.length} Tenor GIFs...`)
+    
+    const tenorIds = tenorGifs.map(g => g.sourceId!).filter(Boolean)
+    const tenorTagsMap = await fetchTenorTags(tenorIds)
+    
+    console.log(`   ✓ Got tags for ${tenorTagsMap.size}/${tenorIds.length} GIFs`)
+    
+    for (const gif of tenorGifs) {
+      const apiTags = tenorTagsMap.get(gif.sourceId!) || []
+      
+      if (options.verbose) {
+        console.log(`\n📦 ${gif.slug} (TENOR)`)
+        console.log(`   Source ID: ${gif.sourceId}`)
+        console.log(`   Current tags: ${gif._count.tags}`)
+        console.log(`   API tags: ${apiTags.join(', ') || '(none from API)'}`)
+      }
+
+      if (!options.dryRun) {
+        if (!options.keepExisting && gif._count.tags > 0) {
+          const wiped = await wipeTagsForGif(gif.id, options.importTagId)
+          tagsWiped += wiped
+        }
+        
+        const added = await createAndLinkTags(gif.id, apiTags, options.importTagId)
+        tagsAdded += added
+      }
+      
+      apiTags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1
+      })
+      
+      processed++
+      if (processed % 100 === 0) {
+        console.log(`   Processed ${processed}/${gifs.length}...`)
+      }
+    }
+  }
+
+  // ========================================
+  // Process Giphy GIFs (individual API calls with concurrency)
+  // ========================================
+  if (giphyGifs.length > 0) {
+    console.log(`\n🎬 Fetching tags for ${giphyGifs.length} Giphy GIFs...`)
+    
+    // Process in batches with concurrency
+    for (let i = 0; i < giphyGifs.length; i += options.concurrency) {
+      const batch = giphyGifs.slice(i, i + options.concurrency)
+      
+      const results = await Promise.all(
+        batch.map(async (gif) => {
+          const apiTags = await fetchGiphyTags(gif.sourceId!)
+          return { gif, apiTags: apiTags || [] }
+        })
+      )
+      
+      for (const { gif, apiTags } of results) {
+        if (options.verbose) {
+          console.log(`\n📦 ${gif.slug} (GIPHY)`)
+          console.log(`   Source ID: ${gif.sourceId}`)
+          console.log(`   Current tags: ${gif._count.tags}`)
+          console.log(`   API tags: ${apiTags.join(', ') || '(none)'}`)
+        }
+
+        if (!options.dryRun) {
+          if (!options.keepExisting && gif._count.tags > 0) {
+            const wiped = await wipeTagsForGif(gif.id, options.importTagId)
+            tagsWiped += wiped
+          }
+          
+          const added = await createAndLinkTags(gif.id, apiTags, options.importTagId)
+          tagsAdded += added
+        }
+        
+        apiTags.forEach(tag => {
+          tagCounts[tag] = (tagCounts[tag] || 0) + 1
+        })
+        
+        processed++
+      }
+      
+      if (processed % 50 === 0) {
+        console.log(`   Processed ${processed}/${gifs.length}...`)
+      }
+      
+      // Rate limiting delay
+      if (i + options.concurrency < giphyGifs.length) {
+        await new Promise(r => setTimeout(r, 50))
+      }
+    }
+  }
+
+  // ========================================
+  // Process Klipy GIFs (no API, extract from title/slug)
+  // ========================================
+  if (klipyGifs.length > 0) {
+    console.log(`\n🎪 Processing ${klipyGifs.length} Klipy GIFs (title-based)...`)
+    
+    for (const gif of klipyGifs) {
+      // For Klipy, extract from title since we don't have API access
+      const tags = extractTagsFromTitle(gif.title)
+      
+      if (options.verbose) {
+        console.log(`\n📦 ${gif.slug} (KLIPY)`)
+        console.log(`   Title: ${gif.title}`)
+        console.log(`   Current tags: ${gif._count.tags}`)
+        console.log(`   Extracted tags: ${tags.join(', ') || '(none)'}`)
+      }
+
+      if (!options.dryRun) {
+        if (!options.keepExisting && gif._count.tags > 0) {
+          const wiped = await wipeTagsForGif(gif.id, options.importTagId)
+          tagsWiped += wiped
+        }
+        
+        const added = await createAndLinkTags(gif.id, tags, options.importTagId)
+        tagsAdded += added
+      }
+      
+      tags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1
+      })
+      
+      processed++
+      if (processed % 100 === 0) {
+        console.log(`   Processed ${processed}/${gifs.length}...`)
+      }
+    }
+  }
+
+  return { processed, tagsWiped, tagsAdded, tagCounts }
+}
+
+// Fallback: extract tags from title (for Klipy or when API fails)
+const STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'have', 'has',
+  'are', 'was', 'were', 'been', 'being', 'will', 'would', 'could', 'should',
+  'may', 'might', 'must', 'shall', 'can', 'need', 'into', 'about',
+  'when', 'you', 'your', 'they', 'them', 'their', 'what', 'where', 'which',
+  'who', 'whom', 'how', 'why', 'all', 'each', 'every', 'both', 'few', 'more',
+  'some', 'any', 'most', 'other', 'such', 'only', 'own', 'same', 'than',
+  'too', 'very', 'just', 'but', 'now', 'also', 'well', 'back', 'even',
+  'new', 'want', 'way', 'look', 'use', 'day', 'good', 'first', 'last',
+  'his', 'her', 'its', 'our', 'out', 'one', 'two', 'three',
+  'a', 'an', 'of', 'on', 'in', 'to', 'at', 'by', 'up', 'is', 'it',
+  'as', 'or', 'if', 'so', 'be', 'do', 'go', 'no', 'my', 'me', 'he', 'we',
+  'gif', 'gifs', 'giphy', 'tenor', 'klipy', 'animated', 'animation',
+  'sticker', 'stickers', 'meme', 'memes', 'reaction', 'reactions',
+  'close', 'front', 'next', 'wearing', 'standing', 'sitting', 'says',
+  'written', 'words', 'above', 'below', 'shows', 'shown', 'face',
+])
+
+function extractTagsFromTitle(title: string): string[] {
+  const words = title
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, ' ')
+    .split(/[\s-]+/)
+    .filter(word => {
+      return word.length >= 2 && 
+             word.length <= 30 &&
+             !STOP_WORDS.has(word) && 
+             !/^\d+$/.test(word) &&
+             !/^[a-z0-9]{10,}$/i.test(word)
+    })
+  
+  return [...new Set(words)]
+}
+
 async function main() {
   const args = process.argv.slice(2)
   const dryRun = args.includes('--dry-run')
   const verbose = args.includes('--verbose')
   const keepExisting = args.includes('--keep-existing')
   
-  // Parse source filter
   const sourceArg = args.find(a => a.startsWith('--source='))
   const sourceFilter = sourceArg ? sourceArg.split('=')[1].toUpperCase() : null
   
-  // Parse limit
   const limitArg = args.find(a => a.startsWith('--limit='))
   const limit = limitArg ? parseInt(limitArg.split('=')[1]) : undefined
+  
+  const concurrencyArg = args.find(a => a.startsWith('--concurrency='))
+  const concurrency = concurrencyArg ? parseInt(concurrencyArg.split('=')[1]) : 5
 
   console.log('═══════════════════════════════════════════════════')
-  console.log('        Re-Tag Imports Script')
+  console.log('     Re-Tag Imports Script (API-based)')
   console.log('═══════════════════════════════════════════════════')
   if (dryRun) {
     console.log('🔸 DRY RUN MODE - No changes will be made')
@@ -228,13 +464,21 @@ async function main() {
   if (limit) {
     console.log(`📌 Limiting to ${limit} GIFs`)
   }
+  console.log(`🔄 Concurrency: ${concurrency}`)
   console.log('')
 
-  // Get the import tag ID
+  // Check API keys
+  if (!TENOR_API_KEY) {
+    console.log('⚠️  TENOR_API_KEY not set - Tenor GIFs will be skipped')
+  }
+  if (!GIPHY_API_KEY) {
+    console.log('⚠️  GIPHY_API_KEY not set - Giphy GIFs will use slug extraction only')
+  }
+
   const importTagId = await ensureImportTag()
   console.log(`✓ Import tag ready (ID: ${importTagId})\n`)
 
-  // Build query - only get imported GIFs (not UPLOAD)
+  // Build query
   const where: any = {
     source: { not: 'UPLOAD' }
   }
@@ -243,7 +487,6 @@ async function main() {
     where.source = sourceFilter
   }
 
-  // Find all imported GIFs
   const gifs = await prisma.gif.findMany({
     where,
     select: {
@@ -251,6 +494,7 @@ async function main() {
       slug: true,
       title: true,
       source: true,
+      sourceId: true,
       sourceUrl: true,
       _count: { select: { tags: true } },
     },
@@ -258,71 +502,17 @@ async function main() {
     take: limit,
   })
 
-  console.log(`Found ${gifs.length} imported GIFs to process\n`)
+  console.log(`Found ${gifs.length} imported GIFs to process`)
 
   if (gifs.length === 0) {
     console.log('✅ No GIFs to process!')
     return
   }
 
-  let processed = 0
-  let tagsWiped = 0
-  let tagsAdded = 0
-  const newTagCounts: Record<string, number> = {}
-
-  for (const gif of gifs) {
-    // Extract tags based on source
-    let tags: Set<string>
-    
-    if (gif.source === 'GIPHY' && gif.sourceUrl) {
-      // For Giphy, extract from the URL slug
-      const urlSlug = gif.sourceUrl.split('/').pop()?.split('-').slice(0, -1).join('-') || ''
-      tags = extractTagsFromGiphySlug(urlSlug)
-      // Also add from title
-      const titleTags = extractTagsFromText(gif.title)
-      titleTags.forEach(t => tags.add(t))
-    } else {
-      // For Tenor and Klipy, extract from title
-      tags = extractTagsFromText(gif.title)
-    }
-    
-    if (verbose) {
-      console.log(`\n📦 ${gif.slug} (${gif.source})`)
-      console.log(`   Title: ${gif.title}`)
-      console.log(`   Source URL: ${gif.sourceUrl || 'N/A'}`)
-      console.log(`   Current tags: ${gif._count.tags}`)
-      console.log(`   New tags: ${Array.from(tags).join(', ') || '(none)'}`)
-    }
-
-    if (!dryRun) {
-      // Wipe existing tags (unless --keep-existing)
-      if (!keepExisting && gif._count.tags > 0) {
-        const wiped = await wipeTagsForGif(gif.id, importTagId)
-        tagsWiped += wiped
-      }
-      
-      // Add new tags
-      const added = await createAndLinkTags(gif.id, tags, importTagId)
-      tagsAdded += added
-      
-      // Count new tags for summary
-      tags.forEach(tag => {
-        newTagCounts[tag] = (newTagCounts[tag] || 0) + 1
-      })
-    } else {
-      // Count for dry run summary
-      tags.forEach(tag => {
-        newTagCounts[tag] = (newTagCounts[tag] || 0) + 1
-      })
-    }
-    
-    processed++
-    
-    // Progress update every 100 GIFs
-    if (processed % 100 === 0) {
-      console.log(`   Processed ${processed}/${gifs.length}...`)
-    }
-  }
+  const { processed, tagsWiped, tagsAdded, tagCounts } = await processGifsInBatches(
+    gifs,
+    { dryRun, verbose, keepExisting, concurrency, importTagId }
+  )
 
   console.log('\n═══════════════════════════════════════════════════')
   console.log('                   Summary')
@@ -333,8 +523,7 @@ async function main() {
     console.log(`Tags added: ${tagsAdded}`)
   }
   
-  // Show top 30 tags
-  const sortedTags = Object.entries(newTagCounts)
+  const sortedTags = Object.entries(tagCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 30)
   

@@ -16,6 +16,7 @@ interface GiphySearchResult {
 interface GiphyGif {
   id: string
   title: string
+  slug: string
   url: string
   images: {
     original?: { url: string; width: string; height: string; size: string }
@@ -79,6 +80,17 @@ export async function POST(request: NextRequest) {
       const sourceIds = results.map(r => r.id)
       const existingMap = await checkExistingBySourceId('GIPHY', sourceIds)
 
+      // Helper to extract tags from Giphy slug (e.g., "confused-flying-YsTs5ltWtEhnq" -> ["confused", "flying"])
+      const extractTagsFromSlug = (slug: string, id: string): string[] => {
+        if (!slug) return []
+        // Remove the ID suffix from slug (last segment after final hyphen is the ID)
+        const withoutId = slug.replace(new RegExp(`-?${id}$`, 'i'), '')
+        // Split by hyphens and filter out empty/short strings
+        return withoutId
+          .split('-')
+          .filter(tag => tag.length >= 2 && !/^\d+$/.test(tag))
+      }
+
       // Transform to common format
       const gifsToImport: GifToImport[] = results
         .filter(result => {
@@ -95,6 +107,8 @@ export async function POST(request: NextRequest) {
           height: parseInt(result.images?.original?.height || '0'),
           fileSize: parseInt(result.images?.original?.size || '0'),
           source: 'GIPHY' as const,
+          // Extract tags from Giphy's slug (contains hyphenated keywords)
+          sourceTags: extractTagsFromSlug(result.slug, result.id),
         }))
 
       const skippedDuplicates = results.length - gifsToImport.length

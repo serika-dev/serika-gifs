@@ -23,6 +23,8 @@ export interface GifToImport {
   height?: number
   fileSize?: number
   source: 'GIPHY' | 'TENOR' | 'KLIPY'
+  /** Tags from the source API (Tenor tags array, Giphy slug extraction, etc.) */
+  sourceTags?: string[]
 }
 
 export interface ImportOptions {
@@ -229,8 +231,28 @@ export async function importSingleGif(
       // Continue without thumbnail
     }
     
-    // Extract tags and add 'import' tag
-    const tags = extractTags(options.query, gif.title)
+    // Use source tags from API if available, otherwise extract from query
+    const tags = new Set<string>()
+    
+    if (gif.sourceTags && gif.sourceTags.length > 0) {
+      // Use tags directly from the source API (Tenor, Giphy slug, etc.)
+      for (const tag of gif.sourceTags) {
+        const normalized = tag.toLowerCase().trim()
+        if (normalized.length >= 2 && normalized.length <= 50) {
+          tags.add(normalized)
+        }
+      }
+    }
+    
+    // Also add the search query as a tag (it's what the user searched for)
+    if (options.query) {
+      const queryTags = options.query
+        .toLowerCase()
+        .split(/[\s,]+/)
+        .filter(t => t.length >= 2)
+      queryTags.forEach(t => tags.add(t))
+    }
+    
     tags.add('import')  // Add import tag to all imported GIFs
     
     // Create GIF record
