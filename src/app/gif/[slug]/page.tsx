@@ -50,23 +50,33 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const mp4Url = gif.mp4Url
   const webmUrl = gif.webmUrl
 
-  // Build the 'other' meta tags like Tenor does
-  // Using arrays for multiple og:video entries
-  const otherMeta: Record<string, string | string[]> = {
-    'og:type': 'video.other',
-    'og:image': gifUrl,
-    'og:image:type': 'image/gif',
-    'og:image:width': String(gif.width),
-    'og:image:height': String(gif.height),
+  // Build video array for OpenGraph - include both MP4 and WebM like Tenor
+  const videos: Array<{
+    url: string
+    secureUrl: string
+    type: string
+    width: number
+    height: number
+  }> = []
+
+  if (mp4Url) {
+    videos.push({
+      url: mp4Url,
+      secureUrl: mp4Url,
+      type: 'video/mp4',
+      width: gif.width,
+      height: gif.height,
+    })
   }
 
-  // Add MP4 video meta tags
-  if (mp4Url) {
-    otherMeta['og:video'] = mp4Url
-    otherMeta['og:video:secure_url'] = mp4Url
-    otherMeta['og:video:type'] = 'video/mp4'
-    otherMeta['og:video:width'] = String(gif.width)
-    otherMeta['og:video:height'] = String(gif.height)
+  if (webmUrl) {
+    videos.push({
+      url: webmUrl,
+      secureUrl: webmUrl,
+      type: 'video/webm',
+      width: gif.width,
+      height: gif.height,
+    })
   }
 
   return {
@@ -76,8 +86,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       title,
       description,
       siteName: 'SerikaGifs',
+      type: 'video.other',
       url: `${SITE_URL}/gif/${slug}`,
-      // OG images array - Discord will use the first one
       images: [
         {
           url: gifUrl,
@@ -87,6 +97,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
           type: 'image/gif',
         },
       ],
+      videos: videos.length > 0 ? videos : undefined,
     },
     twitter: {
       card: 'player',
@@ -102,7 +113,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
         },
       ] : undefined,
     },
-    other: otherMeta,
   }
 }
 
