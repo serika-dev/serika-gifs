@@ -5,6 +5,9 @@ import prisma from '@/lib/prisma'
 
 async function getAllTags() {
   const tags = await prisma.tag.findMany({
+    where: {
+      slug: { not: 'import' }, // Hide internal import tag from users
+    },
     include: {
       _count: {
         select: { gifs: true },

@@ -8,7 +8,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
 
-    const where: any = {}
+    const where: any = {
+      slug: { not: 'import' }, // Hide internal import tag from users
+    }
 
     if (search) {
       where.name = { contains: search, mode: 'insensitive' }

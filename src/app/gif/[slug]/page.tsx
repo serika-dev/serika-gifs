@@ -147,13 +147,13 @@ export default async function GifPage({
             </div>
 
             {/* Tags */}
-            {gif.tags.length > 0 && (
+            {gif.tags.filter(tag => tag.slug !== 'import').length > 0 && (
               <>
                 <Separator />
                 <div>
                   <h3 className="text-xs sm:text-sm lg:text-base font-medium mb-2 sm:mb-2.5">Tags</h3>
                   <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                    {gif.tags.map((tag) => (
+                    {gif.tags.filter(tag => tag.slug !== 'import').map((tag) => (
                       <Link key={tag.slug} href={`/tag/${tag.slug}`}>
                         <Badge
                           variant="secondary"
