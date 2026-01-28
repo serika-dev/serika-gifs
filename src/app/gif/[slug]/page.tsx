@@ -20,6 +20,7 @@ async function getGifForMetadata(slug: string) {
       description: true,
       url: true,
       mp4Url: true,
+      webmUrl: true,
       thumbnailUrl: true,
       width: true,
       height: true,
@@ -38,61 +39,70 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 
   const title = gif.title || 'GIF'
-  
-  // For Discord/Twitter embeds - use MP4 if available for best quality autoplay
-  // Discord auto-plays MP4s as GIFs when they're under certain size/duration
-  const videoUrl = gif.mp4Url
-  const imageUrl = gif.thumbnailUrl || gif.url
+  const description = `Click to view the GIF`
+
+  // Tenor's exact metadata structure for Discord inline video rendering:
+  // - og:type = video.other
+  // - og:image = the GIF file (type: image/gif)
+  // - og:video = the MP4 file (type: video/mp4) 
+  // - Second og:video = the WebM file (type: video/webm)
+  const gifUrl = gif.url
+  const mp4Url = gif.mp4Url
+  const webmUrl = gif.webmUrl
+
+  // Build the 'other' meta tags like Tenor does
+  // Using arrays for multiple og:video entries
+  const otherMeta: Record<string, string | string[]> = {
+    'og:type': 'video.other',
+    'og:image': gifUrl,
+    'og:image:type': 'image/gif',
+    'og:image:width': String(gif.width),
+    'og:image:height': String(gif.height),
+  }
+
+  // Add MP4 video meta tags
+  if (mp4Url) {
+    otherMeta['og:video'] = mp4Url
+    otherMeta['og:video:secure_url'] = mp4Url
+    otherMeta['og:video:type'] = 'video/mp4'
+    otherMeta['og:video:width'] = String(gif.width)
+    otherMeta['og:video:height'] = String(gif.height)
+  }
 
   return {
     title: `${title} | SerikaGifs`,
-    description: title,
+    description,
     openGraph: {
       title,
+      description,
       siteName: 'SerikaGifs',
-      type: 'video.other',
       url: `${SITE_URL}/gif/${slug}`,
-      // Video tags for Discord autoplay embed
-      videos: videoUrl ? [
-        {
-          url: videoUrl,
-          secureUrl: videoUrl,
-          width: gif.width,
-          height: gif.height,
-          type: 'video/mp4',
-        },
-      ] : undefined,
+      // OG images array - Discord will use the first one
       images: [
         {
-          url: imageUrl,
+          url: gifUrl,
           width: gif.width,
           height: gif.height,
           alt: title,
+          type: 'image/gif',
         },
       ],
     },
     twitter: {
       card: 'player',
       title,
-      description: title,
-      images: [imageUrl],
-      players: videoUrl ? [
+      description,
+      images: [gifUrl],
+      players: mp4Url ? [
         {
-          playerUrl: videoUrl,
-          streamUrl: videoUrl,
+          playerUrl: `${SITE_URL}/gif/${slug}`,
+          streamUrl: mp4Url,
           width: gif.width,
           height: gif.height,
         },
       ] : undefined,
     },
-    other: {
-      // These meta tags are needed for Discord to render video inline
-      'og:video': videoUrl || '',
-      'og:video:secure_url': videoUrl || '',
-      'og:video:type': 'video/mp4',
-      'og:video:width': String(gif.width),
-      'og:video:height': String(gif.height),
-    },
+    other: otherMeta,
   }
 }
 

@@ -219,11 +219,14 @@ async function generateWebmFromMp4(mp4Buffer: Buffer, slug: string): Promise<Buf
         '-y',
         '-i', mp4Path,
         '-c:v', 'libvpx-vp9',
-        '-crf', '30',
-        '-b:v', '0',
-        '-deadline', 'realtime',
-        '-cpu-used', '5',
-        '-an',  // No audio
+        '-crf', '18',           // High quality (0-63, lower = better)
+        '-b:v', '2M',           // Target bitrate 2Mbps
+        '-maxrate', '3M',       // Max bitrate
+        '-bufsize', '4M',       // Buffer size
+        '-deadline', 'good',    // Better quality encoding
+        '-cpu-used', '2',       // Slower = better quality (0-5)
+        '-row-mt', '1',         // Multi-threaded row encoding
+        '-an',                  // No audio
         webmPath
       ])
       
@@ -308,11 +311,14 @@ async function generateWebmFromGif(gifBuffer: Buffer, slug: string): Promise<Buf
         '-y',
         '-i', gifPath,
         '-c:v', 'libvpx-vp9',
-        '-crf', '30',
-        '-b:v', '0',
-        '-deadline', 'realtime',
-        '-cpu-used', '5',
-        '-an',  // No audio
+        '-crf', '18',           // High quality (0-63, lower = better)
+        '-b:v', '2M',           // Target bitrate 2Mbps
+        '-maxrate', '3M',       // Max bitrate
+        '-bufsize', '4M',       // Buffer size
+        '-deadline', 'good',    // Better quality encoding
+        '-cpu-used', '2',       // Slower = better quality (0-5)
+        '-row-mt', '1',         // Multi-threaded row encoding
+        '-an',                  // No audio
         webmPath
       ])
       

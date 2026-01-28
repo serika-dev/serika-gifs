@@ -55,18 +55,18 @@ export function GifViewer({ gif }: GifViewerProps) {
   useEffect(() => {
     setMounted(true)
     const saved = localStorage.getItem('gif-quality')
-    if (saved === 'webm' && gif.webmUrl) {
-      setQuality('webm')
-    } else if (saved === 'mp4' && gif.mp4Url) {
+    if (saved === 'mp4' && gif.mp4Url) {
       setQuality('mp4')
+    } else if (saved === 'webm' && gif.webmUrl) {
+      setQuality('webm')
     } else if (saved === 'gif') {
       setQuality('gif')
-    } else if (gif.webmUrl) {
-      // Default to webm if available (best quality + smallest)
-      setQuality('webm')
     } else if (gif.mp4Url) {
-      // Fallback to mp4 if available
+      // Default to mp4 if available (best quality)
       setQuality('mp4')
+    } else if (gif.webmUrl) {
+      // Fallback to webm if available
+      setQuality('webm')
     }
   }, [gif.mp4Url, gif.webmUrl])
 
@@ -199,16 +199,16 @@ export function GifViewer({ gif }: GifViewerProps) {
               <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuLabel className="text-xs">Quality</DropdownMenuLabel>
                 <DropdownMenuRadioGroup value={quality} onValueChange={(v) => setQuality(v as QualityOption)}>
-                  {gif.webmUrl && (
-                    <DropdownMenuRadioItem value="webm" className="text-sm">
-                      WebM
-                      <span className="ml-auto text-xs text-muted-foreground">Best</span>
-                    </DropdownMenuRadioItem>
-                  )}
                   {gif.mp4Url && (
                     <DropdownMenuRadioItem value="mp4" className="text-sm">
                       MP4
-                      <span className="ml-auto text-xs text-muted-foreground">HD</span>
+                      <span className="ml-auto text-xs text-muted-foreground">Best</span>
+                    </DropdownMenuRadioItem>
+                  )}
+                  {gif.webmUrl && (
+                    <DropdownMenuRadioItem value="webm" className="text-sm">
+                      WebM
+                      <span className="ml-auto text-xs text-muted-foreground">Smallest</span>
                     </DropdownMenuRadioItem>
                   )}
                   <DropdownMenuRadioItem value="gif" className="text-sm">
