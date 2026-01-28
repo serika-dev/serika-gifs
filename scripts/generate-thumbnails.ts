@@ -5,13 +5,14 @@
  * generates static WebP thumbnails, and updates the database.
  * 
  * Usage:
- *   bun run scripts/generate-thumbnails.ts [--dry-run] [--verbose] [--limit N] [--force]
+ *   bun run scripts/generate-thumbnails.ts [--dry-run] [--verbose] [--limit N] [--force] [--concurrency N]
  * 
  * Options:
  *   --dry-run: Don't make any changes, just show what would be done
  *   --verbose: Show detailed progress
  *   --limit N: Only process N GIFs
  *   --force: Regenerate thumbnails even if they exist
+ *   --concurrency N: Process N GIFs at a time (default: 10)
  */
 
 import { PrismaClient } from '@prisma/client'
@@ -39,6 +40,8 @@ const verbose = args.includes('--verbose')
 const force = args.includes('--force')
 const limitIdx = args.indexOf('--limit')
 const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1]) : undefined
+const concurrencyIdx = args.indexOf('--concurrency')
+const concurrency = concurrencyIdx !== -1 ? parseInt(args[concurrencyIdx + 1]) : 10
 
 function log(message: string) {
   if (verbose) console.log(message)
@@ -106,6 +109,7 @@ function extractKeyFromUrl(url: string): string | null {
 async function main() {
   console.log('🖼️  Generating static thumbnails for existing GIFs...')
   console.log(`   Mode: ${dryRun ? 'DRY RUN' : 'LIVE'}`)
+  console.log(`   Concurrency: ${concurrency}`)
   if (force) console.log('   Force: Regenerating all thumbnails')
   if (limit) console.log(`   Limit: ${limit} GIFs`)
   console.log('')
@@ -142,30 +146,26 @@ async function main() {
   let failed = 0
   let skipped = 0
   
-  for (const gif of gifs) {
-    processed++
-    
-    log(`[${processed}/${gifs.length}] Processing ${gif.slug}...`)
+  // Process a single GIF
+  async function processGif(gif: typeof gifs[0]): Promise<'success' | 'failed' | 'skipped'> {
+    log(`Processing ${gif.slug}...`)
     
     // Skip if not a GIF URL
     if (!gif.url.endsWith('.gif')) {
       log(`  Skipped: Not a GIF file`)
-      skipped++
-      continue
+      return 'skipped'
     }
     
     // Extract key from URL
     const key = extractKeyFromUrl(gif.url)
     if (!key) {
       log(`  Skipped: Could not extract key from URL`)
-      skipped++
-      continue
+      return 'skipped'
     }
     
     if (dryRun) {
       log(`  Would generate thumbnail for: ${key}`)
-      success++
-      continue
+      return 'success'
     }
     
     try {
@@ -174,8 +174,7 @@ async function main() {
       const gifBuffer = await downloadFromB2(key)
       if (!gifBuffer) {
         log(`  Failed: Could not download GIF`)
-        failed++
-        continue
+        return 'failed'
       }
       
       // Generate thumbnail
@@ -198,16 +197,30 @@ async function main() {
       const reduction = ((sizeBefore - sizeAfter) / sizeBefore * 100).toFixed(1)
       
       log(`  Success: ${(sizeBefore / 1024).toFixed(1)}KB -> ${(sizeAfter / 1024).toFixed(1)}KB (${reduction}% smaller)`)
-      success++
+      return 'success'
     } catch (error) {
       log(`  Error: ${error}`)
-      failed++
+      return 'failed'
+    }
+  }
+  
+  // Process GIFs in batches with concurrency
+  for (let i = 0; i < gifs.length; i += concurrency) {
+    const batch = gifs.slice(i, i + concurrency)
+    const results = await Promise.all(batch.map(processGif))
+    
+    for (const result of results) {
+      processed++
+      if (result === 'success') success++
+      else if (result === 'failed') failed++
+      else skipped++
     }
     
-    // Progress update every 10 GIFs
-    if (processed % 10 === 0) {
-      console.log(`Progress: ${processed}/${gifs.length} (${success} success, ${failed} failed, ${skipped} skipped)`)
-    }
+    // Progress update after each batch
+    const elapsed = Math.round((Date.now() - startTime) / 1000)
+    const rate = processed / elapsed || 0
+    const eta = Math.round((gifs.length - processed) / rate) || 0
+    console.log(`Progress: ${processed}/${gifs.length} (${success} ✓, ${failed} ✗, ${skipped} ⊘) | ${rate.toFixed(1)}/s | ETA: ${eta}s`)
   }
   
   console.log('')
@@ -225,6 +238,8 @@ async function main() {
   
   await prisma.$disconnect()
 }
+
+const startTime = Date.now()
 
 main().catch((error) => {
   console.error('Fatal error:', error)
