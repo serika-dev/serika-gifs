@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { uploadToB2 } from '@/lib/storage'
 import { generateAndUploadThumbnail } from '@/lib/thumbnail'
-import { generateMp4FromGif, generateWebmFromGif, generateWebmFromMp4 } from '@/lib/media-convert'
+import { generateMp4FromGif, generateWebmFromGif, generateWebmFromMp4, generateGifFromMp4, getVideoDimensions, generateThumbnailFromVideo } from '@/lib/media-convert'
 import { nanoid } from 'nanoid'
 import imageSize from 'image-size'
 import { checkRateLimit, rateLimitResponse, addRateLimitHeaders } from '@/lib/rate-limit'
@@ -237,15 +237,28 @@ export async function POST(request: NextRequest) {
     const slug = nanoid(10)
     const key = `gifs/${session.id}/${slug}.${fileExtension}`
 
-    // Get image dimensions
+    // Get image/video dimensions
     let width = 0
     let height = 0
-    try {
-      const dimensions = imageSize(buffer)
-      width = dimensions.width || 0
-      height = dimensions.height || 0
-    } catch (e) {
-      console.error('Error getting image dimensions:', e)
+    
+    if (file.type === 'video/mp4' || file.type === 'video/webm') {
+      // Use ffprobe for video files
+      try {
+        const dimensions = await getVideoDimensions(buffer, slug)
+        width = dimensions.width || 0
+        height = dimensions.height || 0
+      } catch (e) {
+        console.error('Error getting video dimensions:', e)
+      }
+    } else {
+      // Use imageSize for images
+      try {
+        const dimensions = imageSize(buffer)
+        width = dimensions.width || 0
+        height = dimensions.height || 0
+      } catch (e) {
+        console.error('Error getting image dimensions:', e)
+      }
     }
 
     // Upload to B2
@@ -282,8 +295,19 @@ export async function POST(request: NextRequest) {
         console.error('Error generating thumbnail:', e)
       }
     } else if (file.type === 'video/mp4') {
-      // For MP4 uploads, just generate WebM
+      // For MP4 uploads, generate GIF, WebM, and thumbnail
       mp4Url = url  // The original is already MP4
+      
+      // Generate GIF from MP4
+      try {
+        const gifBuffer = await generateGifFromMp4(buffer, slug)
+        const gifKey = `gifs/${session.id}/${slug}.gif`
+        await uploadToB2(gifBuffer, gifKey, 'image/gif')
+      } catch (e) {
+        console.error('Error generating GIF from MP4:', e)
+      }
+      
+      // Generate WebM from MP4
       try {
         const webmBuffer = await generateWebmFromMp4(buffer, slug)
         const webmKey = `gifs/${session.id}/${slug}.webm`
@@ -291,9 +315,27 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error('Error generating WebM from MP4:', e)
       }
+      
+      // Generate thumbnail from video
+      try {
+        const thumbnailBuffer = await generateThumbnailFromVideo(buffer, slug)
+        const thumbnailKey = `thumbnails/${session.id}/${slug}.webp`
+        thumbnailUrl = await uploadToB2(thumbnailBuffer, thumbnailKey, 'image/webp')
+      } catch (e) {
+        console.error('Error generating thumbnail from MP4:', e)
+      }
     } else if (file.type === 'video/webm') {
       // For WebM uploads, the original is already WebM
       webmUrl = url
+      
+      // Generate thumbnail from video
+      try {
+        const thumbnailBuffer = await generateThumbnailFromVideo(buffer, slug)
+        const thumbnailKey = `thumbnails/${session.id}/${slug}.webp`
+        thumbnailUrl = await uploadToB2(thumbnailBuffer, thumbnailKey, 'image/webp')
+      } catch (e) {
+        console.error('Error generating thumbnail from WebM:', e)
+      }
     }
 
     // Create GIF record
