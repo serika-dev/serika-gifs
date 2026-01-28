@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
         isPublic: col.isPublic,
         user: col.user,
         gifCount: col._count.gifs,
+        _count: { gifs: col._count.gifs },
         previewGifs: col.gifs.map((g: typeof col.gifs[number]) => ({
           url: g.gif.url,
           thumbnailUrl: g.gif.thumbnailUrl,
@@ -141,7 +142,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      collection,
+      collection: {
+        ...collection,
+        _count: { gifs: 0 },
+      },
     })
   } catch (error) {
     console.error('Error creating collection:', error)
