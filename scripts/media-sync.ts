@@ -203,6 +203,109 @@ async function isFileCorruptedInB2(key: string, type: 'gif' | 'mp4' | 'webm'): P
   }
 }
 
+// Generate GIF from MP4 using ffmpeg (high quality with palette)
+async function generateGifFromMp4(mp4Buffer: Buffer, slug: string): Promise<Buffer> {
+  const tempDir = join(tmpdir(), 'serika-gifs')
+  await mkdir(tempDir, { recursive: true })
+  
+  const mp4Path = join(tempDir, `${slug}-gif.mp4`)
+  const palettePath = join(tempDir, `${slug}-palette.png`)
+  const gifPath = join(tempDir, `${slug}-out.gif`)
+  
+  try {
+    await writeFile(mp4Path, mp4Buffer)
+    
+    // First pass: generate palette for better quality
+    await new Promise<void>((resolve, reject) => {
+      const ffmpeg = spawn('ffmpeg', [
+        '-y',
+        '-i', mp4Path,
+        '-vf', 'fps=15,scale=480:-1:flags=lanczos,palettegen=stats_mode=diff',
+        palettePath
+      ])
+      
+      let stderr = ''
+      ffmpeg.stderr.on('data', (data) => { stderr += data.toString() })
+      
+      ffmpeg.on('close', (code) => {
+        if (code === 0) resolve()
+        else reject(new Error(`ffmpeg palette exited with ${code}: ${stderr.slice(-200)}`))
+      })
+      
+      ffmpeg.on('error', reject)
+    })
+    
+    // Second pass: generate GIF using palette
+    await new Promise<void>((resolve, reject) => {
+      const ffmpeg = spawn('ffmpeg', [
+        '-y',
+        '-i', mp4Path,
+        '-i', palettePath,
+        '-lavfi', 'fps=15,scale=480:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle',
+        '-loop', '0',
+        gifPath
+      ])
+      
+      let stderr = ''
+      ffmpeg.stderr.on('data', (data) => { stderr += data.toString() })
+      
+      ffmpeg.on('close', (code) => {
+        if (code === 0) resolve()
+        else reject(new Error(`ffmpeg gif exited with ${code}: ${stderr.slice(-200)}`))
+      })
+      
+      ffmpeg.on('error', reject)
+    })
+    
+    const gifBuffer = await Bun.file(gifPath).arrayBuffer()
+    return Buffer.from(gifBuffer)
+  } finally {
+    try { await unlink(mp4Path) } catch {}
+    try { await unlink(palettePath) } catch {}
+    try { await unlink(gifPath) } catch {}
+  }
+}
+
+// Generate thumbnail from video using ffmpeg
+async function generateThumbnailFromVideo(videoBuffer: Buffer, slug: string): Promise<Buffer> {
+  const tempDir = join(tmpdir(), 'serika-gifs')
+  await mkdir(tempDir, { recursive: true })
+  
+  const videoPath = join(tempDir, `${slug}-thumb-in.mp4`)
+  const thumbPath = join(tempDir, `${slug}-thumb.webp`)
+  
+  try {
+    await writeFile(videoPath, videoBuffer)
+    
+    await new Promise<void>((resolve, reject) => {
+      const ffmpeg = spawn('ffmpeg', [
+        '-y',
+        '-i', videoPath,
+        '-vframes', '1',
+        '-vf', 'scale=400:-1',
+        '-q:v', '80',
+        thumbPath
+      ])
+      
+      let stderr = ''
+      ffmpeg.stderr.on('data', (data) => { stderr += data.toString() })
+      
+      ffmpeg.on('close', (code) => {
+        if (code === 0) resolve()
+        else reject(new Error(`ffmpeg thumb exited with ${code}: ${stderr.slice(-200)}`))
+      })
+      
+      ffmpeg.on('error', reject)
+    })
+    
+    const thumbBuffer = await Bun.file(thumbPath).arrayBuffer()
+    return Buffer.from(thumbBuffer)
+  } finally {
+    try { await unlink(videoPath) } catch {}
+    try { await unlink(thumbPath) } catch {}
+  }
+}
+
 // Generate WebM from MP4 using ffmpeg
 async function generateWebmFromMp4(mp4Buffer: Buffer, slug: string): Promise<Buffer> {
   const tempDir = join(tmpdir(), 'serika-gifs')
@@ -403,7 +506,7 @@ interface ProcessResult {
   thumbOk: boolean
   corrupted: { gif: boolean; mp4: boolean; webm: boolean }
   downloaded: { gif: boolean; mp4: boolean; webm: boolean; thumb: boolean }
-  generated: { mp4: boolean; webm: boolean }
+  generated: { gif: boolean; mp4: boolean; webm: boolean; thumb: boolean }
   errors: string[]
 }
 
@@ -430,7 +533,7 @@ async function processGif(
     thumbOk: false,
     corrupted: { gif: false, mp4: false, webm: false },
     downloaded: { gif: false, mp4: false, webm: false, thumb: false },
-    generated: { mp4: false, webm: false },
+    generated: { gif: false, mp4: false, webm: false, thumb: false },
     errors: [],
   }
 
@@ -689,26 +792,86 @@ async function processGif(
     }
   }
 
+  // Generate GIF from MP4 if GIF is missing but MP4 exists (for user uploads)
+  if (!result.gifOk && !sourceGifUrl && result.mp4Ok) {
+    // Get MP4 buffer if we don't have it
+    if (!mp4Buffer) {
+      try {
+        const mp4Url = gif.mp4Url || `${CDN_BASE}/${mp4Key}`
+        mp4Buffer = await downloadFile(mp4Url)
+      } catch {
+        // Can't get MP4
+      }
+    }
+    
+    if (mp4Buffer) {
+      try {
+        if (options.verbose) console.log(`   🔄 Generating GIF from MP4...`)
+        gifBuffer = await generateGifFromMp4(mp4Buffer, gif.slug)
+        
+        await uploadToB2(gifBuffer, gifKey, 'image/gif')
+        result.gifOk = true
+        result.generated.gif = true
+        
+        await prisma.gif.update({
+          where: { id: gif.id },
+          data: { 
+            url: `${CDN_BASE}/${gifKey}`,
+          },
+        })
+        
+        if (options.verbose) console.log(`   ✓ GIF generated from MP4 (${formatBytes(gifBuffer.length)})`)
+      } catch (e) {
+        result.errors.push(`GIF generate from MP4: ${e}`)
+        if (options.verbose) console.log(`   ✗ GIF generation from MP4 failed: ${e}`)
+      }
+    }
+  }
+
   // Generate thumbnail if missing or forced
-  if ((!thumbExists || options.force) && (gifBuffer || result.gifOk)) {
+  if ((!thumbExists || options.force)) {
     try {
       if (options.verbose) console.log(`   🖼️  Generating thumbnail...`)
       
-      // Get GIF buffer if we don't have it
+      let thumbBuffer: Buffer | null = null
+      
+      // Try to generate from GIF first
       if (!gifBuffer && result.gifOk) {
-        const existingUrl = gif.url || `${CDN_BASE}/${gifKey}`
-        gifBuffer = await downloadFile(existingUrl)
+        try {
+          const existingUrl = gif.url || `${CDN_BASE}/${gifKey}`
+          gifBuffer = await downloadFile(existingUrl)
+        } catch {
+          // Can't get GIF
+        }
       }
       
       if (gifBuffer) {
-        const thumbBuffer = await sharp(gifBuffer, { animated: false, pages: 1 })
+        // Generate from GIF using sharp
+        thumbBuffer = await sharp(gifBuffer, { animated: false, pages: 1 })
           .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
           .webp({ quality: 80 })
           .toBuffer()
+      } else if (result.mp4Ok || mp4Buffer) {
+        // Fallback: generate from MP4/video using ffmpeg
+        if (!mp4Buffer) {
+          try {
+            const mp4Url = gif.mp4Url || `${CDN_BASE}/${mp4Key}`
+            mp4Buffer = await downloadFile(mp4Url)
+          } catch {
+            // Can't get MP4
+          }
+        }
         
+        if (mp4Buffer) {
+          thumbBuffer = await generateThumbnailFromVideo(mp4Buffer, gif.slug)
+          result.generated.thumb = true
+        }
+      }
+      
+      if (thumbBuffer) {
         await uploadToB2(thumbBuffer, thumbKey, 'image/webp')
         result.thumbOk = true
-        result.downloaded.thumb = true
+        if (!result.generated.thumb) result.downloaded.thumb = true
         
         await prisma.gif.update({
           where: { id: gif.id },
@@ -816,7 +979,7 @@ async function main() {
   let missing = { gif: 0, mp4: 0, webm: 0, thumb: 0 }
   let corrupted = { gif: 0, mp4: 0, webm: 0 }
   let downloaded = { gif: 0, mp4: 0, webm: 0, thumb: 0 }
-  let generated = { mp4: 0, webm: 0 }
+  let generated = { gif: 0, mp4: 0, webm: 0, thumb: 0 }
   let errors = 0
 
   // Process Tenor GIFs
@@ -847,8 +1010,10 @@ async function main() {
         if (result.downloaded.mp4) downloaded.mp4++
         if (result.downloaded.webm) downloaded.webm++
         if (result.downloaded.thumb) downloaded.thumb++
+        if (result.generated.gif) generated.gif++
         if (result.generated.mp4) generated.mp4++
         if (result.generated.webm) generated.webm++
+        if (result.generated.thumb) generated.thumb++
         if (result.errors.length > 0) errors++
       }
       
@@ -893,8 +1058,10 @@ async function main() {
         if (result.downloaded.mp4) downloaded.mp4++
         if (result.downloaded.webm) downloaded.webm++
         if (result.downloaded.thumb) downloaded.thumb++
+        if (result.generated.gif) generated.gif++
         if (result.generated.mp4) generated.mp4++
         if (result.generated.webm) generated.webm++
+        if (result.generated.thumb) generated.thumb++
         if (result.errors.length > 0) errors++
       }
       
@@ -942,8 +1109,10 @@ async function main() {
         if (result.downloaded.mp4) downloaded.mp4++
         if (result.downloaded.webm) downloaded.webm++
         if (result.downloaded.thumb) downloaded.thumb++
+        if (result.generated.gif) generated.gif++
         if (result.generated.mp4) generated.mp4++
         if (result.generated.webm) generated.webm++
+        if (result.generated.thumb) generated.thumb++
         if (result.errors.length > 0) errors++
       }
       
@@ -986,9 +1155,11 @@ async function main() {
     console.log(`   WebM:      ${downloaded.webm}`)
     console.log(`   Thumbnail: ${downloaded.thumb}`)
     console.log('')
-    console.log('Generated (from GIF):')
-    console.log(`   MP4:       ${generated.mp4}`)
-    console.log(`   WebM:      ${generated.webm}`)
+    console.log('Generated:')
+    console.log(`   GIF:       ${generated.gif} (from MP4)`)
+    console.log(`   MP4:       ${generated.mp4} (from GIF)`)
+    console.log(`   WebM:      ${generated.webm} (from MP4/GIF)`)
+    console.log(`   Thumbnail: ${generated.thumb} (from video)`)
     console.log('')
   }
   console.log(`Errors:           ${errors}`)
