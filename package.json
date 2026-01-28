@@ -12,6 +12,8 @@
     "db:deduplicate:dry": "bun run scripts/deduplicate-gifs.ts --dry-run --verbose",
     "db:backfill-tags": "bun run scripts/backfill-tags.ts",
     "db:backfill-tags:dry": "bun run scripts/backfill-tags.ts --dry-run --verbose",
+    "db:retag-imports": "bun run scripts/retag-imports.ts",
+    "db:retag-imports:dry": "bun run scripts/retag-imports.ts --dry-run --verbose",
     "db:fix-dimensions": "bun run scripts/fix-dimensions.ts",
     "db:generate-thumbnails": "bun run scripts/generate-thumbnails.ts",
     "db:generate-thumbnails:dry": "bun run scripts/generate-thumbnails.ts --dry-run --verbose",
