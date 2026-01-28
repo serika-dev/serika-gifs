@@ -1,0 +1,27 @@
+{
+  "name": "vencord-gif-provider",
+  "version": "1.0.0",
+  "description": "Vencord plugin to switch GIF providers (Tenor, Giphy, Klipy, Serika GIFs, Imgur)",
+  "main": "index.ts",
+  "author": "Serika",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Pikachubolk/vencord-gif-provider.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Pikachubolk/vencord-gif-provider/issues"
+  },
+  "homepage": "https://github.com/Pikachubolk/vencord-gif-provider#readme",
+  "keywords": [
+    "vencord",
+    "discord",
+    "plugin",
+    "gif",
+    "tenor",
+    "giphy",
+    "klipy",
+    "serika",
+    "imgur"
+  ]
+}
