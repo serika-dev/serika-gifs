@@ -83,8 +83,12 @@ export function GifGrid({
     }
   }, [search, tag, userId, source, sort, timeRange])
 
-  // Reset to page 1 and refetch when filters change
+  // Reset to page 1 and refetch when filters change - but only if not using initialGifs
   useEffect(() => {
+    // Skip fetching if we have initialGifs and no search/filter params
+    if (initialGifs && !search && !tag && !userId && !source) {
+      return
+    }
     setPage(1)
     fetchGifs(1)
   }, [search, tag, userId, source, sort, timeRange])
