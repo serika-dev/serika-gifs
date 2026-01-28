@@ -4,11 +4,12 @@
  * This script updates all GIF URLs from the old Backblaze format to the new CDN format.
  * 
  * Usage:
- *   bun run scripts/migrate-cdn-urls.ts [--dry-run] [--verbose]
+ *   bun run scripts/migrate-cdn-urls.ts [--dry-run] [--verbose] [--concurrency N]
  * 
  * Options:
  *   --dry-run: Don't make any changes, just show what would be done
  *   --verbose: Show detailed progress
+ *   --concurrency N: Process N GIFs at a time (default: 20)
  */
 
 import { PrismaClient } from '@prisma/client'
@@ -22,6 +23,8 @@ const prisma = new PrismaClient()
 const args = process.argv.slice(2)
 const dryRun = args.includes('--dry-run')
 const verbose = args.includes('--verbose')
+const concurrencyIdx = args.indexOf('--concurrency')
+const concurrency = concurrencyIdx !== -1 ? parseInt(args[concurrencyIdx + 1]) : 20
 
 const NEW_CDN_HOST = 'cdn.ado.wtf'
 
@@ -62,8 +65,9 @@ async function main() {
   console.log('        CDN URL Migration Script')
   console.log('═══════════════════════════════════════════════════')
   console.log(`New CDN: https://${NEW_CDN_HOST}`)
+  console.log(`Concurrency: ${concurrency}`)
   if (dryRun) {
-    console.log('🔸 DRY RUN MODE - No changes will be made\n')
+    console.log('🔸 DRY RUN MODE - No changes will be made')
   }
   console.log('')
 
@@ -79,23 +83,26 @@ async function main() {
 
   console.log(`Found ${gifs.length} GIFs to check\n`)
 
+  let processed = 0
   let updated = 0
   let alreadyCDN = 0
   let errors = 0
+  const startTime = Date.now()
 
-  for (const gif of gifs) {
+  // Process a single GIF
+  async function processGif(gif: typeof gifs[0]): Promise<'updated' | 'already' | 'error'> {
     const newUrl = convertToCDN(gif.url)
     const newThumbUrl = gif.thumbnailUrl ? convertToCDN(gif.thumbnailUrl) : null
 
     if (!newUrl && !newThumbUrl) {
       if (isAlreadyCDN(gif.url)) {
-        alreadyCDN++
+        return 'already'
       }
-      continue
+      return 'already'
     }
 
     if (verbose) {
-      console.log(`\n📦 ${gif.slug}`)
+      console.log(`📦 ${gif.slug}`)
       if (newUrl) {
         console.log(`   URL: ${gif.url}`)
         console.log(`     → ${newUrl}`)
@@ -115,14 +122,33 @@ async function main() {
             ...(newThumbUrl && { thumbnailUrl: newThumbUrl }),
           },
         })
-        updated++
+        return 'updated'
       } catch (error) {
         console.error(`  ✗ Error updating ${gif.slug}:`, error)
-        errors++
+        return 'error'
       }
     } else {
-      updated++
+      return 'updated'
     }
+  }
+
+  // Process GIFs in batches with concurrency
+  for (let i = 0; i < gifs.length; i += concurrency) {
+    const batch = gifs.slice(i, i + concurrency)
+    const results = await Promise.all(batch.map(processGif))
+    
+    for (const result of results) {
+      processed++
+      if (result === 'updated') updated++
+      else if (result === 'already') alreadyCDN++
+      else errors++
+    }
+    
+    // Progress update after each batch
+    const elapsed = Math.round((Date.now() - startTime) / 1000)
+    const rate = processed / elapsed || 0
+    const eta = Math.round((gifs.length - processed) / rate) || 0
+    console.log(`Progress: ${processed}/${gifs.length} (${updated} updated, ${alreadyCDN} already CDN, ${errors} errors) | ${rate.toFixed(1)}/s | ETA: ${eta}s`)
   }
 
   console.log('')
