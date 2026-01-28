@@ -14,9 +14,10 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { Heart, Copy, Download, Share2, Link as LinkIcon, Code, MoreHorizontal, Loader2, Pencil, Settings2 } from 'lucide-react'
+import { Heart, Copy, Download, Share2, Link as LinkIcon, Code, MoreHorizontal, Loader2, Pencil, Settings2, Bookmark } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/auth-context'
+import { SaveToCollection } from '@/components/save-to-collection'
 import Link from 'next/link'
 
 type QualityOption = 'webm' | 'mp4' | 'gif'
@@ -243,6 +244,12 @@ export function GifViewer({ gif }: GifViewerProps) {
             <Share2 className="h-4 w-4 sm:mr-2" />
             <span className="ml-2 sm:ml-0 hidden xs:inline">Share</span>
           </Button>
+
+          <SaveToCollection 
+            gifId={gif.id} 
+            variant="button"
+            className="flex-1 sm:flex-none h-8 sm:h-9 px-3"
+          />
           
           <Button variant="outline" size="sm" onClick={copyUrl} className="flex-1 sm:flex-none hidden xs:flex">
             <Copy className="h-4 w-4 sm:mr-2" />

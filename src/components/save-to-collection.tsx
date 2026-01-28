@@ -167,6 +167,23 @@ export function SaveToCollection({ gifId, className, variant = 'icon' }: SaveToC
   }
 
   if (!user) {
+    if (variant === 'button') {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          className={className}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            toast.error('Please log in to save GIFs')
+          }}
+        >
+          <Bookmark className="h-4 w-4 sm:mr-2" />
+          <span className="ml-2 sm:ml-0 hidden xs:inline">Save</span>
+        </Button>
+      )
+    }
     return (
       <Button
         size="icon"
@@ -189,13 +206,24 @@ export function SaveToCollection({ gifId, className, variant = 'icon' }: SaveToC
     <>
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild onClick={handleClick}>
-          <Button
-            size="icon"
-            variant="secondary"
-            className={className || "h-7 w-7 sm:h-7 sm:w-7 min-h-[28px] min-w-[28px] bg-black/50 hover:bg-black/70 active:bg-black/80 border-0 text-white touch-manipulation"}
-          >
-            <Bookmark className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${isSavedAnywhere ? 'fill-current' : ''}`} />
-          </Button>
+          {variant === 'button' ? (
+            <Button
+              size="sm"
+              variant={isSavedAnywhere ? 'default' : 'outline'}
+              className={className}
+            >
+              <Bookmark className={`h-4 w-4 sm:mr-2 ${isSavedAnywhere ? 'fill-current' : ''}`} />
+              <span className="ml-2 sm:ml-0 hidden xs:inline">{isSavedAnywhere ? 'Saved' : 'Save'}</span>
+            </Button>
+          ) : (
+            <Button
+              size="icon"
+              variant="secondary"
+              className={className || "h-7 w-7 sm:h-7 sm:w-7 min-h-[28px] min-w-[28px] bg-black/50 hover:bg-black/70 active:bg-black/80 border-0 text-white touch-manipulation"}
+            >
+              <Bookmark className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${isSavedAnywhere ? 'fill-current' : ''}`} />
+            </Button>
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56" onClick={handleClick}>
           {isLoading ? (
