@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { FolderOpen, Plus, Lock, Globe, Loader2 } from 'lucide-react'
+import { FolderOpen, Plus, Lock, Globe, Loader2, Pin } from 'lucide-react'
 import Link from 'next/link'
 import { useRequireAuth } from '@/contexts/auth-context'
 import { toast } from 'sonner'
@@ -28,6 +28,7 @@ interface Collection {
   name: string
   description?: string | null
   isPublic: boolean
+  isGlobal?: boolean
   _count: {
     gifs: number
   }
@@ -92,6 +93,31 @@ export default function MyCollectionsPage() {
       toast.error('Failed to create collection')
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  const toggleGlobal = async (collectionId: string, isGlobal: boolean) => {
+    try {
+      const response = await fetch(`/api/collections/${collectionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isGlobal }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setCollections(prev => 
+          prev.map(col => 
+            col.id === collectionId ? { ...col, isGlobal } : col
+          )
+        )
+        toast.success(isGlobal ? 'Collection pinned as global category' : 'Removed from global categories')
+      } else {
+        toast.error(data.error || 'Failed to update collection')
+      }
+    } catch {
+      toast.error('Failed to update collection')
     }
   }
 
@@ -198,31 +224,57 @@ export default function MyCollectionsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {collections.map((collection) => (
-              <Link key={collection.id} href={`/collection/${collection.id}`}>
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <FolderOpen className="h-5 w-5 text-primary" />
-                      {collection.name}
-                      {collection.isPublic ? (
-                        <Globe className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Lock className="h-4 w-4 text-muted-foreground" />
+              <div key={collection.id} className="relative">
+                <Link href={`/collection/${collection.id}`}>
+                  <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <FolderOpen className="h-5 w-5 text-primary" />
+                        {collection.name}
+                        {collection.isGlobal && (
+                          <Pin className="h-4 w-4 text-yellow-500" />
+                        )}
+                        {collection.isPublic ? (
+                          <Globe className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Lock className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {collection.description && (
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                          {collection.description}
+                        </p>
                       )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {collection.description && (
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                        {collection.description}
-                      </p>
-                    )}
-                    <Badge variant="secondary">
-                      {collection._count.gifs} GIFs
-                    </Badge>
-                  </CardContent>
-                </Card>
-              </Link>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          {collection._count.gifs} GIFs
+                        </Badge>
+                        {collection.isGlobal && (
+                          <Badge variant="outline" className="text-yellow-500 border-yellow-500">
+                            Global
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+                {user?.isAdmin && (
+                  <Button
+                    size="sm"
+                    variant={collection.isGlobal ? "default" : "outline"}
+                    className="absolute top-2 right-2 h-7 w-7 p-0"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      toggleGlobal(collection.id, !collection.isGlobal)
+                    }}
+                    title={collection.isGlobal ? "Remove from global" : "Make global category"}
+                  >
+                    <Pin className={`h-3.5 w-3.5 ${collection.isGlobal ? 'fill-current' : ''}`} />
+                  </Button>
+                )}
+              </div>
             ))}
           </div>
         )}

@@ -1,7 +1,7 @@
 import { Header } from '@/components/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { FolderOpen, Lock } from 'lucide-react'
+import { FolderOpen, Lock, Pin } from 'lucide-react'
 import Link from 'next/link'
 import prisma from '@/lib/prisma'
 
@@ -20,7 +20,10 @@ async function getPublicCollections() {
         select: { gifs: true },
       },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [
+      { isGlobal: 'desc' },
+      { createdAt: 'desc' },
+    ],
     take: 50,
   })
 
@@ -50,11 +53,14 @@ export default async function CollectionsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {collections.map((collection: typeof collections[number]) => (
               <Link key={collection.id} href={`/collection/${collection.id}`}>
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+                <Card className={`hover:border-primary/50 transition-colors cursor-pointer h-full ${collection.isGlobal ? 'border-yellow-500/50' : ''}`}>
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <FolderOpen className="h-5 w-5 text-primary" />
                       {collection.name}
+                      {collection.isGlobal && (
+                        <Pin className="h-4 w-4 text-yellow-500" />
+                      )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -64,9 +70,16 @@ export default async function CollectionsPage() {
                       </p>
                     )}
                     <div className="flex items-center justify-between">
-                      <Badge variant="secondary">
-                        {collection._count.gifs} GIFs
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          {collection._count.gifs} GIFs
+                        </Badge>
+                        {collection.isGlobal && (
+                          <Badge variant="outline" className="text-yellow-500 border-yellow-500">
+                            Featured
+                          </Badge>
+                        )}
+                      </div>
                       <span className="text-xs text-muted-foreground">
                         by {collection.user.username}
                       </span>

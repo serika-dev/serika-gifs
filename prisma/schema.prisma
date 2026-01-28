@@ -89,6 +89,7 @@ model Collection {
   slug          String
   description   String?
   isPublic      Boolean   @default(true)
+  isGlobal      Boolean   @default(false) // Staff-only: pinned to top as global category
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -99,6 +100,7 @@ model Collection {
 
   @@unique([userId, slug])
   @@index([userId])
+  @@index([isGlobal])
 }
 
 model GifOnCollection {

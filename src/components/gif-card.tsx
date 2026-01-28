@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Heart, Eye, Copy, Download, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { SaveToCollection } from '@/components/save-to-collection'
 import type { Gif } from '@/hooks/use-gifs'
 
 interface GifCardProps {
@@ -104,6 +105,7 @@ export function GifCard({
           {/* Quick actions - larger touch targets on mobile */}
           {showQuickActions && (
             <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 flex gap-0.5 sm:gap-1 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
+              <SaveToCollection gifId={gif.id} />
               <QuickActionButton onClick={copyUrl} icon={<Copy className="h-3 w-3 sm:h-3.5 sm:w-3.5" />} />
               <QuickActionButton onClick={downloadGif} icon={<Download className="h-3 w-3 sm:h-3.5 sm:w-3.5" />} />
               <QuickActionButton onClick={shareGif} icon={<Share2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />} />

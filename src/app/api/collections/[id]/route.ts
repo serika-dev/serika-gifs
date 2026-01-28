@@ -129,6 +129,10 @@ export async function PATCH(
     }
     if (body.description !== undefined) updateData.description = body.description
     if (body.isPublic !== undefined) updateData.isPublic = body.isPublic
+    // Only admins can set isGlobal
+    if (body.isGlobal !== undefined && session.isAdmin) {
+      updateData.isGlobal = body.isGlobal
+    }
 
     const updated = await prisma.collection.update({
       where: { id },
