@@ -124,18 +124,25 @@ model Favorite {
 }
 
 model ApiKey {
-  id            String    @id @default(cuid())
+  id            String      @id @default(cuid())
   name          String
-  key           String    @unique
+  key           String      @unique
+  tier          ApiKeyTier  @default(TIER_1)
   lastUsedAt    DateTime?
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime    @default(now())
   expiresAt     DateTime?
   
   userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([key])
   @@index([userId])
+}
+
+enum ApiKeyTier {
+  TIER_1  // 100k requests/hour (default)
+  TIER_2  // 1M requests/hour (quota request required)
+  TIER_3  // Unlimited (quota request required, admin keys auto-upgrade)
 }
 
 model ImportJob {

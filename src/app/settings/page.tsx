@@ -34,8 +34,16 @@ interface ApiKey {
   id: string
   name: string
   key: string
+  tier: 'TIER_1' | 'TIER_2' | 'TIER_3'
+  effectiveTier: 'TIER_1' | 'TIER_2' | 'TIER_3'
   createdAt: string
   lastUsedAt?: string
+}
+
+const TIER_INFO = {
+  TIER_1: { name: 'Tier 1', limit: '100k/hour', color: 'bg-zinc-500' },
+  TIER_2: { name: 'Tier 2', limit: '1M/hour', color: 'bg-blue-500' },
+  TIER_3: { name: 'Tier 3', limit: 'Unlimited', color: 'bg-amber-500' },
 }
 
 interface NotificationSettings {
@@ -57,6 +65,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingKeys, setIsLoadingKeys] = useState(true)
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
+  const [isAdmin, setIsAdmin] = useState(false)
   const [showKey, setShowKey] = useState<string | null>(null)
   const [newKeyName, setNewKeyName] = useState('')
   
@@ -90,6 +99,7 @@ export default function SettingsPage() {
       const data = await response.json()
       if (data.keys) {
         setApiKeys(data.keys)
+        setIsAdmin(data.isAdmin || false)
       }
     } catch {
       console.error('Failed to load API keys')
@@ -275,63 +285,84 @@ export default function SettingsPage() {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {apiKeys.map((key) => (
-                      <div
-                        key={key.id}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                      >
-                        <div className="space-y-1 flex-1 min-w-0">
-                          <p className="font-medium">{key.name}</p>
-                          <div className="flex items-center gap-2">
-                            <code className="text-xs bg-background px-2 py-1 rounded truncate max-w-[200px]">
-                              {showKey === key.id ? key.key : '••••••••••••••••••••••••'}
-                            </code>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0"
-                              onClick={() => setShowKey(showKey === key.id ? null : key.id)}
-                            >
-                              {showKey === key.id ? (
-                                <EyeOff className="h-3 w-3" />
-                              ) : (
-                                <Eye className="h-3 w-3" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0"
-                              onClick={() => copyToClipboard(key.key)}
-                            >
-                              <Copy className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          {key.lastUsedAt && (
-                            <p className="text-xs text-muted-foreground">
-                              Last used: {new Date(key.lastUsedAt).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive shrink-0"
-                          onClick={() => deleteApiKey(key.id)}
+                    {apiKeys.map((key) => {
+                      const tierInfo = TIER_INFO[key.effectiveTier]
+                      return (
+                        <div
+                          key={key.id}
+                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="space-y-1 flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{key.name}</p>
+                              <span className={`text-xs px-2 py-0.5 rounded-full text-white ${tierInfo.color}`}>
+                                {tierInfo.name} ({tierInfo.limit})
+                              </span>
+                              {isAdmin && key.tier !== key.effectiveTier && (
+                                <span className="text-xs text-muted-foreground">(Admin)</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <code className="text-xs bg-background px-2 py-1 rounded truncate max-w-[200px]">
+                                {showKey === key.id ? key.key : '••••••••••••••••••••••••'}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0"
+                                onClick={() => setShowKey(showKey === key.id ? null : key.id)}
+                              >
+                                {showKey === key.id ? (
+                                  <EyeOff className="h-3 w-3" />
+                                ) : (
+                                  <Eye className="h-3 w-3" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0"
+                                onClick={() => copyToClipboard(key.key)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            {key.lastUsedAt && (
+                              <p className="text-xs text-muted-foreground">
+                                Last used: {new Date(key.lastUsedAt).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive shrink-0"
+                            onClick={() => deleteApiKey(key.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 
-                <div className="pt-4 border-t">
-                  <h4 className="text-sm font-medium mb-2">API Documentation</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Use your API key with the <code className="bg-muted px-1 rounded">X-API-Key</code> header
-                    or as a query parameter <code className="bg-muted px-1 rounded">?api_key=YOUR_KEY</code>
-                  </p>
+                <div className="pt-4 border-t space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Rate Limits</h4>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p><span className="inline-block w-3 h-3 rounded-full bg-zinc-500 mr-2"></span><strong>Tier 1:</strong> 100,000 requests/hour (default)</p>
+                      <p><span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span><strong>Tier 2:</strong> 1,000,000 requests/hour (request quota increase)</p>
+                      <p><span className="inline-block w-3 h-3 rounded-full bg-amber-500 mr-2"></span><strong>Tier 3:</strong> Unlimited (request quota increase)</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">API Usage</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Use your API key with the <code className="bg-muted px-1 rounded">X-API-Key</code> header
+                      or as a query parameter <code className="bg-muted px-1 rounded">?api_key=YOUR_KEY</code>
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

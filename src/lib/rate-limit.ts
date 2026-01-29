@@ -1,19 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from './prisma'
+import { ApiKeyTier } from '@prisma/client'
 
 // In-memory rate limit store (resets on server restart)
 // For production, use Redis or a database
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 
 // Rate limit configuration
-const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000 // 1 hour
 const RATE_LIMIT_MAX_REQUESTS = 30 // 30 requests per minute for anonymous users
+
+// Tier-based rate limits (per hour)
+const TIER_LIMITS: Record<ApiKeyTier, number> = {
+  TIER_1: 100_000,   // 100k/hour (default)
+  TIER_2: 1_000_000, // 1M/hour (quota request required)
+  TIER_3: Infinity,  // Unlimited (admin only)
+}
 
 interface RateLimitResult {
   allowed: boolean
   remaining: number
   resetTime: number
   isAuthenticated: boolean
+  tier?: ApiKeyTier
+  limit?: number
 }
 
 /**
@@ -26,9 +36,9 @@ function getClientId(request: NextRequest): string {
 }
 
 /**
- * Validate an API key and return the user ID if valid
+ * Validate an API key and return key info if valid
  */
-async function validateApiKey(apiKey: string): Promise<string | null> {
+async function validateApiKey(apiKey: string): Promise<{ userId: string; tier: ApiKeyTier; isAdmin: boolean } | null> {
   if (!apiKey || !apiKey.startsWith('sgif_')) {
     return null
   }
@@ -36,7 +46,14 @@ async function validateApiKey(apiKey: string): Promise<string | null> {
   try {
     const key = await prisma.apiKey.findUnique({
       where: { key: apiKey },
-      select: { id: true, userId: true },
+      select: { 
+        id: true, 
+        userId: true, 
+        tier: true,
+        user: {
+          select: { isAdmin: true }
+        }
+      },
     })
 
     if (key) {
@@ -45,7 +62,9 @@ async function validateApiKey(apiKey: string): Promise<string | null> {
         where: { id: key.id },
         data: { lastUsedAt: new Date() },
       })
-      return key.userId
+      // Admin keys are always TIER_3
+      const effectiveTier = key.user.isAdmin ? ApiKeyTier.TIER_3 : key.tier
+      return { userId: key.userId, tier: effectiveTier, isAdmin: key.user.isAdmin }
     }
   } catch (error) {
     console.error('Error validating API key:', error)
@@ -63,21 +82,56 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
   const apiKey = request.headers.get('x-api-key') || request.headers.get('authorization')?.replace('Bearer ', '')
   
   if (apiKey) {
-    const userId = await validateApiKey(apiKey)
-    if (userId) {
-      // Authenticated users have no rate limit
+    const keyInfo = await validateApiKey(apiKey)
+    if (keyInfo) {
+      const limit = TIER_LIMITS[keyInfo.tier]
+      
+      // Tier 3 (unlimited) - no rate limiting
+      if (keyInfo.tier === ApiKeyTier.TIER_3) {
+        return {
+          allowed: true,
+          remaining: Infinity,
+          resetTime: 0,
+          isAuthenticated: true,
+          tier: keyInfo.tier,
+          limit,
+        }
+      }
+      
+      // Tier 1 and Tier 2 - apply hourly rate limits
+      const rateLimitKey = `api:${keyInfo.userId}`
+      const now = Date.now()
+      
+      let record = rateLimitStore.get(rateLimitKey)
+      
+      if (!record || now > record.resetTime) {
+        record = {
+          count: 0,
+          resetTime: now + RATE_LIMIT_WINDOW,
+        }
+      }
+      
+      record.count++
+      rateLimitStore.set(rateLimitKey, record)
+      
+      const allowed = record.count <= limit
+      const remaining = Math.max(0, limit - record.count)
+      
       return {
-        allowed: true,
-        remaining: Infinity,
-        resetTime: 0,
+        allowed,
+        remaining,
+        resetTime: record.resetTime,
         isAuthenticated: true,
+        tier: keyInfo.tier,
+        limit,
       }
     }
   }
 
-  // Anonymous users get rate limited
+  // Anonymous users get rate limited (per minute, more restrictive)
   const clientId = getClientId(request)
   const now = Date.now()
+  const anonWindow = 60 * 1000 // 1 minute for anonymous
   
   let record = rateLimitStore.get(clientId)
   
@@ -85,7 +139,7 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
   if (!record || now > record.resetTime) {
     record = {
       count: 0,
-      resetTime: now + RATE_LIMIT_WINDOW,
+      resetTime: now + anonWindow,
     }
   }
   
@@ -106,22 +160,28 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
 /**
  * Create a rate limit error response
  */
-export function rateLimitResponse(resetTime: number): NextResponse {
+export function rateLimitResponse(resetTime: number, result?: RateLimitResult): NextResponse {
   const retryAfter = Math.ceil((resetTime - Date.now()) / 1000)
+  const limit = result?.limit || RATE_LIMIT_MAX_REQUESTS
+  const tier = result?.tier
   
   return NextResponse.json(
     {
       error: 'Rate limit exceeded',
-      message: 'Too many requests. Please try again later or use an API key for unlimited access.',
+      message: tier 
+        ? `Rate limit exceeded for ${tier.replace('_', ' ')}. ${tier === 'TIER_1' ? 'Request a quota increase for higher limits.' : 'Please try again later.'}`
+        : 'Too many requests. Please try again later or use an API key for higher limits.',
       retryAfter,
+      tier,
     },
     {
       status: 429,
       headers: {
         'Retry-After': String(retryAfter),
-        'X-RateLimit-Limit': String(RATE_LIMIT_MAX_REQUESTS),
+        'X-RateLimit-Limit': String(limit),
         'X-RateLimit-Remaining': '0',
         'X-RateLimit-Reset': String(Math.ceil(resetTime / 1000)),
+        ...(tier && { 'X-RateLimit-Tier': tier }),
       },
     }
   )
@@ -134,13 +194,21 @@ export function addRateLimitHeaders(
   response: NextResponse,
   result: RateLimitResult
 ): NextResponse {
-  if (!result.isAuthenticated) {
-    response.headers.set('X-RateLimit-Limit', String(RATE_LIMIT_MAX_REQUESTS))
+  const limit = result.limit || RATE_LIMIT_MAX_REQUESTS
+  
+  if (result.tier !== ApiKeyTier.TIER_3) {
+    response.headers.set('X-RateLimit-Limit', String(limit))
     response.headers.set('X-RateLimit-Remaining', String(result.remaining))
     response.headers.set('X-RateLimit-Reset', String(Math.ceil(result.resetTime / 1000)))
+    if (result.tier) {
+      response.headers.set('X-RateLimit-Tier', result.tier)
+    }
   }
   return response
 }
+
+// Export tier limits for use in other files
+export { TIER_LIMITS, ApiKeyTier }
 
 // Cleanup old rate limit records periodically (every 5 minutes)
 setInterval(() => {
