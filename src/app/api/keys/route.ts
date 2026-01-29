@@ -26,7 +26,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     })
 
-    // Check if user is admin (admin keys are always effectively TIER_3)
+    // Check if user is admin (admin keys are always effectively TIER_5)
     const user = await prisma.user.findUnique({
       where: { id: session.id },
       select: { isAdmin: true },
@@ -34,7 +34,7 @@ export async function GET() {
 
     const keysWithEffectiveTier = keys.map(key => ({
       ...key,
-      effectiveTier: user?.isAdmin ? ApiKeyTier.TIER_3 : key.tier,
+      effectiveTier: user?.isAdmin ? ApiKeyTier.TIER_5 : key.tier,
     }))
 
     return NextResponse.json({ keys: keysWithEffectiveTier, isAdmin: user?.isAdmin })
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
         name: apiKey.name,
         key: apiKey.key,
         tier: apiKey.tier,
-        effectiveTier: user?.isAdmin ? ApiKeyTier.TIER_3 : apiKey.tier,
+        effectiveTier: user?.isAdmin ? ApiKeyTier.TIER_5 : apiKey.tier,
         createdAt: apiKey.createdAt.toISOString(),
       },
     })

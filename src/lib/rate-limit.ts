@@ -8,13 +8,15 @@ const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 
 // Rate limit configuration
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000 // 1 hour
-const RATE_LIMIT_MAX_REQUESTS = 30 // 30 requests per minute for anonymous users
+const RATE_LIMIT_MAX_REQUESTS = 30 // 30 requests per hour for anonymous users
 
 // Tier-based rate limits (per hour)
 const TIER_LIMITS: Record<ApiKeyTier, number> = {
-  TIER_1: 100_000,   // 100k/hour (default)
-  TIER_2: 1_000_000, // 1M/hour (quota request required)
-  TIER_3: Infinity,  // Unlimited (admin only)
+  TIER_1: 1_000,       // 1k/hour (default)
+  TIER_2: 10_000,      // 10k/hour (quota request required)
+  TIER_3: 100_000,     // 100k/hour (quota request required)
+  TIER_4: 1_000_000,   // 1M/hour (quota request required)
+  TIER_5: Infinity,    // Unlimited (quota request required, admin keys auto-upgrade)
 }
 
 interface RateLimitResult {
@@ -62,8 +64,8 @@ async function validateApiKey(apiKey: string): Promise<{ userId: string; tier: A
         where: { id: key.id },
         data: { lastUsedAt: new Date() },
       })
-      // Admin keys are always TIER_3
-      const effectiveTier = key.user.isAdmin ? ApiKeyTier.TIER_3 : key.tier
+      // Admin keys are always TIER_5
+      const effectiveTier = key.user.isAdmin ? ApiKeyTier.TIER_5 : key.tier
       return { userId: key.userId, tier: effectiveTier, isAdmin: key.user.isAdmin }
     }
   } catch (error) {
@@ -86,8 +88,8 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
     if (keyInfo) {
       const limit = TIER_LIMITS[keyInfo.tier]
       
-      // Tier 3 (unlimited) - no rate limiting
-      if (keyInfo.tier === ApiKeyTier.TIER_3) {
+      // Tier 5 (unlimited) - no rate limiting
+      if (keyInfo.tier === ApiKeyTier.TIER_5) {
         return {
           allowed: true,
           remaining: Infinity,
@@ -98,7 +100,7 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
         }
       }
       
-      // Tier 1 and Tier 2 - apply hourly rate limits
+      // Tier 1-4 - apply hourly rate limits
       const rateLimitKey = `api:${keyInfo.userId}`
       const now = Date.now()
       
@@ -196,7 +198,7 @@ export function addRateLimitHeaders(
 ): NextResponse {
   const limit = result.limit || RATE_LIMIT_MAX_REQUESTS
   
-  if (result.tier !== ApiKeyTier.TIER_3) {
+  if (result.tier !== ApiKeyTier.TIER_5) {
     response.headers.set('X-RateLimit-Limit', String(limit))
     response.headers.set('X-RateLimit-Remaining', String(result.remaining))
     response.headers.set('X-RateLimit-Reset', String(Math.ceil(result.resetTime / 1000)))

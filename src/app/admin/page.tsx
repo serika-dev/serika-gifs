@@ -7,7 +7,9 @@ import {
   Image as ImageIcon, 
   BarChart3,
   Settings,
-  Key
+  Key,
+  ArrowUpCircle,
+  Shield
 } from 'lucide-react'
 import prisma from '@/lib/prisma'
 
@@ -118,6 +120,30 @@ export default async function AdminPage() {
                 <CardTitle>Manage Users</CardTitle>
                 <CardDescription>
                   View and manage user accounts
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+
+          <Link href="/admin/quotas">
+            <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <ArrowUpCircle className="h-8 w-8 text-primary mb-2" />
+                <CardTitle>Quota Requests</CardTitle>
+                <CardDescription>
+                  Review API key tier upgrade requests
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+
+          <Link href="/admin/dmca">
+            <Card className="border-border/50 hover:border-red-500/50 transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <Shield className="h-8 w-8 text-red-500 mb-2" />
+                <CardTitle>DMCA Requests</CardTitle>
+                <CardDescription>
+                  Handle copyright takedown requests
                 </CardDescription>
               </CardHeader>
             </Card>
