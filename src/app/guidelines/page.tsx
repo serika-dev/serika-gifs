@@ -54,7 +54,7 @@ const TIER_REQUIREMENTS = [
       { text: 'Follow content policies', required: true },
       { text: 'No redistribution of bulk data', required: true },
       { text: 'Attribution required in app/website', required: true },
-      { text: 'Link to serikagifs.com somewhere visible', required: true },
+      { text: 'Link to gifs.serika.dev somewhere visible', required: true },
     ],
     description: 'For established applications. Must include attribution and link.',
   },
@@ -71,7 +71,7 @@ const TIER_REQUIREMENTS = [
       { text: 'No redistribution of bulk data', required: true },
       { text: 'Display "Powered by SerikaGifs" badge', required: true },
       { text: 'Include SerikaGifs logo or text attribution', required: true },
-      { text: 'Link to serikagifs.com in attribution', required: true },
+      { text: 'Link to gifs.serika.dev in attribution', required: true },
     ],
     description: 'For high-traffic applications. Must display "Powered by SerikaGifs" badge.',
   },
@@ -89,7 +89,7 @@ const TIER_REQUIREMENTS = [
       { text: 'Display "Powered by SerikaGifs" badge prominently', required: true },
       { text: 'Include SerikaGifs branding in search UI', required: true },
       { text: 'Use "Search SerikaGifs" or similar naming in GIF search features', required: true },
-      { text: 'Link to serikagifs.com in attribution', required: true },
+      { text: 'Link to gifs.serika.dev in attribution', required: true },
       { text: 'Compliance review may be required', required: true },
     ],
     description: 'Unlimited access for partners. Must include "Search SerikaGifs" naming in GIF features.',
@@ -255,7 +255,7 @@ export default function GuidelinesPage() {
                   <CardContent className="py-4">
                     <p className="text-sm">Include a text link in your application:</p>
                     <code className="block mt-2 text-xs bg-background p-2 rounded">
-                      GIFs provided by &lt;a href=&quot;https://serikagifs.com&quot;&gt;SerikaGifs&lt;/a&gt;
+                      GIFs provided by &lt;a href=&quot;https://gifs.serika.dev&quot;&gt;SerikaGifs&lt;/a&gt;
                     </code>
                   </CardContent>
                 </Card>
