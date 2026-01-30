@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Header } from '@/components/header'
 import { GifGrid } from '@/components/gif-grid'
 import { Badge } from '@/components/ui/badge'
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -12,17 +12,18 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { 
-  TrendingUp, 
-  Flame, 
-  Clock, 
-  Heart, 
+import {
+  TrendingUp,
+  Flame,
+  Clock,
+  Heart,
   Eye,
   Calendar,
+  Shuffle,
 } from 'lucide-react'
 import Link from 'next/link'
 
-type SortOption = 'trending' | 'newest' | 'popular' | 'most-viewed'
+type SortOption = 'trending' | 'newest' | 'popular' | 'most-viewed' | 'random'
 type TimeRange = 'day' | 'week' | 'month' | 'all'
 
 export default function TrendingPage() {
@@ -34,6 +35,7 @@ export default function TrendingPage() {
     { value: 'newest', label: 'Newest', icon: Clock },
     { value: 'popular', label: 'Most Favorited', icon: Heart },
     { value: 'most-viewed', label: 'Most Viewed', icon: Eye },
+    { value: 'random', label: 'Shuffle', icon: Shuffle },
   ]
 
   const timeRangeOptions = [
@@ -66,6 +68,7 @@ export default function TrendingPage() {
                 {sort === 'newest' && 'Fresh GIFs just uploaded'}
                 {sort === 'popular' && 'GIFs with the most favorites'}
                 {sort === 'most-viewed' && 'The most watched GIFs'}
+                {sort === 'random' && 'Random selection of GIFs'}
               </p>
             </div>
           </div>
@@ -142,8 +145,8 @@ export default function TrendingPage() {
               ❤️ Favorites
             </Badge>
           </Link>
-          <Badge 
-            variant="outline" 
+          <Badge
+            variant="outline"
             className="cursor-pointer hover:bg-primary/10 whitespace-nowrap"
           >
             🔥 Hot Today
@@ -151,7 +154,7 @@ export default function TrendingPage() {
         </div>
 
         {/* GIF Grid */}
-        <GifGrid 
+        <GifGrid
           sort={sort}
           timeRange={timeRange}
           emptyMessage="No GIFs found"

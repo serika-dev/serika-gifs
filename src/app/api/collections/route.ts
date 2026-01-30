@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId') || ''
     const page = parseInt(searchParams.get('page') || '1')
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100)
+    const sort = searchParams.get('sort') || 'popular'
 
     const skip = (page - 1) * limit
 
@@ -23,6 +24,23 @@ export async function GET(request: NextRequest) {
       }
     } else {
       where.isPublic = true
+    }
+
+    // Determine sort order
+    // Always prioritize global collections unless specific sort requested?
+    // User requested "popular to least popular", so we default to gifs count
+    let orderBy: any[] = [{ isGlobal: 'desc' }]
+
+    switch (sort) {
+      case 'newest':
+        orderBy.push({ updatedAt: 'desc' })
+        break
+      case 'alphabetical':
+        orderBy.push({ name: 'asc' })
+        break
+      case 'popular':
+      default:
+        orderBy.push({ gifs: { _count: 'desc' } })
     }
 
     const [collections, total] = await Promise.all([
@@ -47,10 +65,7 @@ export async function GET(request: NextRequest) {
             select: { gifs: true },
           },
         },
-        orderBy: [
-          { isGlobal: 'desc' },
-          { updatedAt: 'desc' },
-        ],
+        orderBy,
         skip,
         take: limit,
       }),
@@ -95,7 +110,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession()
-    
+
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' },

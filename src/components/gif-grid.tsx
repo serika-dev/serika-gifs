@@ -21,20 +21,20 @@ interface GifGridProps {
   tag?: string
   userId?: string
   source?: string
-  sort?: 'trending' | 'newest' | 'popular' | 'most-viewed'
+  sort?: 'trending' | 'newest' | 'popular' | 'most-viewed' | 'random'
   timeRange?: 'day' | 'week' | 'month' | 'all'
   emptyMessage?: string
   emptySubMessage?: string
   columns?: 'default' | 'compact' | 'wide'
 }
 
-export function GifGrid({ 
-  initialGifs, 
-  search, 
-  tag, 
-  userId, 
+export function GifGrid({
+  initialGifs,
+  search,
+  tag,
+  userId,
   source,
-  sort = 'newest',
+  sort = 'trending',
   timeRange = 'all',
   emptyMessage = 'No GIFs found',
   emptySubMessage = 'Try a different search or upload some GIFs!',
@@ -73,7 +73,7 @@ export function GifGrid({
 
       setGifs(data.gifs)
       setTotalPages(data.pagination.totalPages)
-      
+
       // Scroll to top when changing pages
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch {

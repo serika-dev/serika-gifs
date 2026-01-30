@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   try {
     // Check rate limit for anonymous users
     const rateLimitResult = await checkRateLimit(request)
-    
+
     if (!rateLimitResult.allowed) {
       return rateLimitResponse(rateLimitResult.resetTime)
     }
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     if (timeRange !== 'all') {
       const now = new Date()
       let startDate: Date
-      
+
       switch (timeRange) {
         case 'day':
           startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
         default:
           startDate = new Date(0)
       }
-      
+
       where.createdAt = { gte: startDate }
     }
 
@@ -104,15 +104,28 @@ export async function GET(request: NextRequest) {
       case 'most-viewed':
         orderBy = { views: 'desc' }
         break
+      case 'random':
+        // Will be handled separately
+        orderBy = undefined
+        break
       case 'newest':
-      default:
         orderBy = { createdAt: 'desc' }
+        break
+      default:
+        // Default to trending (popular)
+        orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
     }
 
     // Source filtering removed - all GIFs treated equally
 
-    const [gifs, total] = await Promise.all([
-      prisma.gif.findMany({
+    let gifs
+    let total
+
+    if (sort === 'random') {
+      total = await prisma.gif.count({ where })
+      const randomSkip = Math.floor(Math.random() * Math.max(0, total - limit))
+
+      gifs = await prisma.gif.findMany({
         where,
         include: {
           user: {
@@ -133,12 +146,42 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        orderBy,
-        skip,
+        skip: randomSkip,
         take: limit,
-      }),
-      prisma.gif.count({ where }),
-    ])
+      })
+    } else {
+      const result = await Promise.all([
+        prisma.gif.findMany({
+          where,
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                avatar: true,
+              },
+            },
+            tags: {
+              include: {
+                tag: true,
+              },
+            },
+            _count: {
+              select: {
+                favorites: true,
+              },
+            },
+          },
+          orderBy,
+          skip,
+          take: limit,
+        }),
+        prisma.gif.count({ where }),
+      ])
+
+      gifs = result[0]
+      total = result[1]
+    }
 
     const formattedGifs = gifs.map((gif: typeof gifs[number]) => ({
       id: gif.id,
@@ -185,7 +228,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession()
-    
+
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -240,7 +283,7 @@ export async function POST(request: NextRequest) {
     // Get image/video dimensions
     let width = 0
     let height = 0
-    
+
     if (file.type === 'video/mp4' || file.type === 'video/webm') {
       // Use ffprobe for video files
       try {
@@ -297,7 +340,7 @@ export async function POST(request: NextRequest) {
     } else if (file.type === 'video/mp4') {
       // For MP4 uploads, generate GIF, WebM, and thumbnail
       mp4Url = url  // The original is already MP4
-      
+
       // Generate GIF from MP4
       try {
         const gifBuffer = await generateGifFromMp4(buffer, slug)
@@ -306,7 +349,7 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error('Error generating GIF from MP4:', e)
       }
-      
+
       // Generate WebM from MP4
       try {
         const webmBuffer = await generateWebmFromMp4(buffer, slug)
@@ -315,7 +358,7 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error('Error generating WebM from MP4:', e)
       }
-      
+
       // Generate thumbnail from video
       try {
         const thumbnailBuffer = await generateThumbnailFromVideo(buffer, slug)
@@ -327,7 +370,7 @@ export async function POST(request: NextRequest) {
     } else if (file.type === 'video/webm') {
       // For WebM uploads, the original is already WebM
       webmUrl = url
-      
+
       // Generate thumbnail from video
       try {
         const thumbnailBuffer = await generateThumbnailFromVideo(buffer, slug)
@@ -359,10 +402,10 @@ export async function POST(request: NextRequest) {
     // Handle tags
     if (tags) {
       const tagNames = tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
-      
+
       for (const tagName of tagNames) {
         const tagSlug = tagName.replace(/\s+/g, '-')
-        
+
         const tag = await prisma.tag.upsert({
           where: { slug: tagSlug },
           create: { name: tagName, slug: tagSlug },
