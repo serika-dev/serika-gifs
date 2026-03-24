@@ -11,20 +11,44 @@ interface SearchPageProps {
 async function getMatchingTags(query: string) {
   if (!query) return []
   
-  return await prisma.tag.findMany({
+  const tags = await prisma.tag.findMany({
     where: {
       name: {
         contains: query,
         mode: 'insensitive',
       },
     },
-    take: 12,
+    include: {
+      _count: {
+        select: { gifs: true }
+      }
+    },
+    take: 20, // Fetch a few more to allow for better sorting
     orderBy: {
       gifs: {
         _count: 'desc',
       },
     },
   })
+
+  // Prioritize 1. Exact matches 2. Prefix matches 3. Popularity
+  return tags.sort((a, b) => {
+    const aLower = a.name.toLowerCase()
+    const bLower = b.name.toLowerCase()
+    const qLower = query.toLowerCase()
+
+    const aExact = aLower === qLower
+    const bExact = bLower === qLower
+    if (aExact && !bExact) return -1
+    if (bExact && !aExact) return 1
+
+    const aPrefix = aLower.startsWith(qLower)
+    const bPrefix = bLower.startsWith(qLower)
+    if (aPrefix && !bPrefix) return -1
+    if (bPrefix && !aPrefix) return 1
+
+    return 0 // Keep relative order (popularity)
+  }).slice(0, 12)
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
