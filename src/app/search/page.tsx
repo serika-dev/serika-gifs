@@ -1,31 +1,78 @@
 import { Header } from '@/components/header'
 import { GifGrid } from '@/components/gif-grid'
+import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
+import prisma from '@/lib/prisma'
 
 interface SearchPageProps {
   searchParams: Promise<{ q?: string }>
 }
 
+async function getMatchingTags(query: string) {
+  if (!query) return []
+  
+  return await prisma.tag.findMany({
+    where: {
+      name: {
+        contains: query,
+        mode: 'insensitive',
+      },
+    },
+    take: 12,
+    orderBy: {
+      gifs: {
+        _count: 'desc',
+      },
+    },
+  })
+}
+
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q } = await searchParams
   const query = q || ''
+  const matchingTags = await getMatchingTags(query)
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">
+        <div className="mb-8 overflow-hidden">
+          <h1 className="text-3xl font-bold mb-2 truncate">
             {query ? `Search results for "${query}"` : 'Search GIFs'}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-6">
             {query
-              ? 'Showing GIFs matching your search'
+              ? `Found GIFs and tags matching your query.`
               : 'Enter a search term to find GIFs'}
           </p>
+
+          {matchingTags.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Related Tags
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {matchingTags.map((tag) => (
+                  <Link key={tag.id} href={`/tag/${tag.slug}`}>
+                    <Badge variant="secondary" className="px-3 py-1 hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer text-sm font-medium">
+                      #{tag.name}
+                    </Badge>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {query && <GifGrid search={query} />}
+        {query && (
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              GIF Results
+            </h2>
+            <GifGrid search={query} />
+          </div>
+        )}
       </main>
     </div>
   )

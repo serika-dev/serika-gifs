@@ -69,10 +69,24 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ]
+      const searchTerms = search.split(/\s+/).filter(Boolean)
+      if (searchTerms.length > 0) {
+        where.AND = searchTerms.map((term) => ({
+          OR: [
+            { title: { contains: term, mode: 'insensitive' } },
+            { description: { contains: term, mode: 'insensitive' } },
+            {
+              tags: {
+                some: {
+                  tag: {
+                    name: { contains: term, mode: 'insensitive' },
+                  },
+                },
+              },
+            },
+          ],
+        }))
+      }
     }
 
     if (tag) {
