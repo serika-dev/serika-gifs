@@ -195,6 +195,36 @@ export async function GET(request: NextRequest) {
 
       gifs = result[0]
       total = result[1]
+
+      // Fallback if no results found for specific timeRange
+      if (total === 0 && timeRange !== 'all') {
+        const fallbackWhere = { ...where }
+        delete fallbackWhere.createdAt
+
+        const fallbackResult = await Promise.all([
+          prisma.gif.findMany({
+            where: fallbackWhere,
+            include: {
+              user: {
+                select: { id: true, username: true, avatar: true },
+              },
+              tags: {
+                include: { tag: true },
+              },
+              _count: {
+                select: { favorites: true },
+              },
+            },
+            orderBy,
+            skip,
+            take: limit,
+          }),
+          prisma.gif.count({ where: fallbackWhere }),
+        ])
+
+        gifs = fallbackResult[0]
+        total = fallbackResult[1]
+      }
     }
 
     const formattedGifs = gifs.map((gif: typeof gifs[number]) => ({
