@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       where.createdAt = { gte: startDate }
     }
 
-    let searchRelevanceSort: any[] | undefined
+    const isSearching = !!search
     if (search) {
       const searchTerms = search.split(/\s+/).filter(Boolean)
       if (searchTerms.length > 0) {
@@ -84,15 +84,6 @@ export async function GET(request: NextRequest) {
             },
           },
         ])
-        // For search, default to relevance sorting (title matches first, then views)
-        if (sort === 'trending') {
-          // When searching with trending sort, prioritize title matches then views
-          searchRelevanceSort = [
-            { title: { contains: search, mode: 'insensitive' } },
-            { views: 'desc' },
-            { createdAt: 'desc' },
-          ]
-        }
       }
     }
 
@@ -112,33 +103,24 @@ export async function GET(request: NextRequest) {
 
     // Determine sort order
     let orderBy: any
-    if (search && searchRelevanceSort) {
-      // Use relevance-based sorting for search results
-      orderBy = searchRelevanceSort
-    } else {
-      switch (sort) {
-        case 'trending':
-          // Trending = combination of views and recency
-          orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
-          break
-        case 'popular':
-          // Most favorited
-          orderBy = { favorites: { _count: 'desc' } }
-          break
-        case 'most-viewed':
-          orderBy = { views: 'desc' }
-          break
-        case 'random':
-          // Will be handled separately
-          orderBy = undefined
-          break
-        case 'newest':
-          orderBy = { createdAt: 'desc' }
-          break
-        default:
-          // Default to trending
-          orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
-      }
+    switch (sort) {
+      case 'trending':
+        orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
+        break
+      case 'popular':
+        orderBy = { favorites: { _count: 'desc' } }
+        break
+      case 'most-viewed':
+        orderBy = { views: 'desc' }
+        break
+      case 'random':
+        orderBy = undefined
+        break
+      case 'newest':
+        orderBy = { createdAt: 'desc' }
+        break
+      default:
+        orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
     }
 
     // Source filtering removed - all GIFs treated equally
@@ -236,6 +218,35 @@ export async function GET(request: NextRequest) {
         gifs = fallbackResult[0]
         total = fallbackResult[1]
       }
+    }
+
+    // When searching, re-rank results by relevance (title match > tag match > views)
+    if (isSearching && gifs.length > 1) {
+      const searchLower = search.toLowerCase()
+      const searchTerms = searchLower.split(/\s+/).filter(Boolean)
+      gifs = [...gifs].sort((a: typeof gifs[number], b: typeof gifs[number]) => {
+        const aTitle = a.title.toLowerCase()
+        const bTitle = b.title.toLowerCase()
+        // Exact title match ranks highest
+        const aExact = aTitle === searchLower
+        const bExact = bTitle === searchLower
+        if (aExact !== bExact) return aExact ? -1 : 1
+        // Title starts with search query
+        const aStarts = aTitle.startsWith(searchLower)
+        const bStarts = bTitle.startsWith(searchLower)
+        if (aStarts !== bStarts) return aStarts ? -1 : 1
+        // Title contains search query
+        const aContains = aTitle.includes(searchLower)
+        const bContains = bTitle.includes(searchLower)
+        if (aContains !== bContains) return aContains ? -1 : 1
+        // Count how many search terms match the title
+        const aTitleMatches = searchTerms.filter((t) => aTitle.includes(t)).length
+        const bTitleMatches = searchTerms.filter((t) => bTitle.includes(t)).length
+        if (aTitleMatches !== bTitleMatches) return bTitleMatches - aTitleMatches
+        // Fallback: views desc, then recency
+        if (a.views !== b.views) return b.views - a.views
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
     }
 
     const formattedGifs = gifs.map((gif: typeof gifs[number]) => ({
