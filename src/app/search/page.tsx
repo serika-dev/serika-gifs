@@ -94,7 +94,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <h2 className="text-lg font-semibold mb-4">
               GIF Results
             </h2>
-            <GifGrid search={query} />
+            <GifGrid search={query} sort="trending" />
           </div>
         )}
       </main>

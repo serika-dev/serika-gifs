@@ -111,8 +111,8 @@ export default function UploadPage() {
 
       const data = await response.json()
 
-      if (data.error) {
-        toast.error(data.error)
+      if (!response.ok || data.error) {
+        toast.error(data.error || 'Failed to upload GIF')
         return
       }
 

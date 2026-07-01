@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const tag = searchParams.get('tag') || ''
     const userId = searchParams.get('userId') || ''
     const source = searchParams.get('source') || ''
-    const sort = searchParams.get('sort') || 'newest'
+    const sort = searchParams.get('sort') || 'trending'
     const timeRange = searchParams.get('timeRange') || 'all'
 
     const skip = (page - 1) * limit
@@ -68,24 +68,31 @@ export async function GET(request: NextRequest) {
       where.createdAt = { gte: startDate }
     }
 
+    let searchRelevanceSort: any[] | undefined
     if (search) {
       const searchTerms = search.split(/\s+/).filter(Boolean)
       if (searchTerms.length > 0) {
-        where.AND = searchTerms.map((term) => ({
-          OR: [
-            { title: { contains: term, mode: 'insensitive' } },
-            { description: { contains: term, mode: 'insensitive' } },
-            {
-              tags: {
-                some: {
-                  tag: {
-                    name: { contains: term, mode: 'insensitive' },
-                  },
-                },
+        // Use OR for broader matching - any term can match
+        where.OR = searchTerms.flatMap((term) => [
+          { title: { contains: term, mode: 'insensitive' } },
+          { description: { contains: term, mode: 'insensitive' } },
+          {
+            tags: {
+              some: {
+                tag: { name: { contains: term, mode: 'insensitive' } },
               },
             },
-          ],
-        }))
+          },
+        ])
+        // For search, default to relevance sorting (title matches first, then views)
+        if (sort === 'trending') {
+          // When searching with trending sort, prioritize title matches then views
+          searchRelevanceSort = [
+            { title: { contains: search, mode: 'insensitive' } },
+            { views: 'desc' },
+            { createdAt: 'desc' },
+          ]
+        }
       }
     }
 
@@ -105,29 +112,33 @@ export async function GET(request: NextRequest) {
 
     // Determine sort order
     let orderBy: any
-    switch (sort) {
-      case 'trending':
-        // Trending = combination of recent views and favorites
-        // For now, use views as proxy, weighted by recency
-        orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
-        break
-      case 'popular':
-        // Most favorited
-        orderBy = { favorites: { _count: 'desc' } }
-        break
-      case 'most-viewed':
-        orderBy = { views: 'desc' }
-        break
-      case 'random':
-        // Will be handled separately
-        orderBy = undefined
-        break
-      case 'newest':
-        orderBy = { createdAt: 'desc' }
-        break
-      default:
-        // Default to trending (popular)
-        orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
+    if (search && searchRelevanceSort) {
+      // Use relevance-based sorting for search results
+      orderBy = searchRelevanceSort
+    } else {
+      switch (sort) {
+        case 'trending':
+          // Trending = combination of views and recency
+          orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
+          break
+        case 'popular':
+          // Most favorited
+          orderBy = { favorites: { _count: 'desc' } }
+          break
+        case 'most-viewed':
+          orderBy = { views: 'desc' }
+          break
+        case 'random':
+          // Will be handled separately
+          orderBy = undefined
+          break
+        case 'newest':
+          orderBy = { createdAt: 'desc' }
+          break
+        default:
+          // Default to trending
+          orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
+      }
     }
 
     // Source filtering removed - all GIFs treated equally
@@ -348,8 +359,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upload to B2
-    const url = await uploadToB2(buffer, key, file.type)
+    // Upload original to B2
+    let url = await uploadToB2(buffer, key, file.type)
 
     // Generate MP4 and WebM versions, and thumbnail
     let mp4Url: string | null = null
@@ -385,11 +396,11 @@ export async function POST(request: NextRequest) {
       // For MP4 uploads, generate GIF, WebM, and thumbnail
       mp4Url = url  // The original is already MP4
 
-      // Generate GIF from MP4
+      // Generate GIF from MP4 and use it as the primary URL
       try {
         const gifBuffer = await generateGifFromMp4(buffer, slug)
         const gifKey = `gifs/${session.id}/${slug}.gif`
-        await uploadToB2(gifBuffer, gifKey, 'image/gif')
+        url = await uploadToB2(gifBuffer, gifKey, 'image/gif')
       } catch (e) {
         console.error('Error generating GIF from MP4:', e)
       }
@@ -415,6 +426,24 @@ export async function POST(request: NextRequest) {
       // For WebM uploads, the original is already WebM
       webmUrl = url
 
+      // Generate GIF from WebM and use it as the primary URL
+      try {
+        const gifBuffer = await generateGifFromMp4(buffer, slug)
+        const gifKey = `gifs/${session.id}/${slug}.gif`
+        url = await uploadToB2(gifBuffer, gifKey, 'image/gif')
+      } catch (e) {
+        console.error('Error generating GIF from WebM:', e)
+      }
+
+      // Generate MP4 from WebM
+      try {
+        const mp4Buffer = await generateMp4FromGif(buffer, slug)
+        const mp4Key = `gifs/${session.id}/${slug}.mp4`
+        mp4Url = await uploadToB2(mp4Buffer, mp4Key, 'video/mp4')
+      } catch (e) {
+        console.error('Error generating MP4 from WebM:', e)
+      }
+
       // Generate thumbnail from video
       try {
         const thumbnailBuffer = await generateThumbnailFromVideo(buffer, slug)
@@ -422,6 +451,31 @@ export async function POST(request: NextRequest) {
         thumbnailUrl = await uploadToB2(thumbnailBuffer, thumbnailKey, 'image/webp')
       } catch (e) {
         console.error('Error generating thumbnail from WebM:', e)
+      }
+    } else if (file.type === 'image/webp') {
+      // For WebP uploads, generate thumbnail and try video conversions
+      try {
+        thumbnailUrl = await generateAndUploadThumbnail(buffer, session.id, slug)
+      } catch (e) {
+        console.error('Error generating thumbnail from WebP:', e)
+      }
+
+      // Try to generate MP4 from WebP (works if animated)
+      try {
+        const mp4Buffer = await generateMp4FromGif(buffer, slug)
+        const mp4Key = `gifs/${session.id}/${slug}.mp4`
+        mp4Url = await uploadToB2(mp4Buffer, mp4Key, 'video/mp4')
+      } catch (e) {
+        console.error('Error generating MP4 from WebP:', e)
+      }
+
+      // Try to generate WebM from WebP
+      try {
+        const webmBuffer = await generateWebmFromGif(buffer, slug)
+        const webmKey = `gifs/${session.id}/${slug}.webm`
+        webmUrl = await uploadToB2(webmBuffer, webmKey, 'video/webm')
+      } catch (e) {
+        console.error('Error generating WebM from WebP:', e)
       }
     }
 
