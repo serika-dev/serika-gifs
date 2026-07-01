@@ -34,7 +34,6 @@ import {
   Zap,
   Trash2,
   Flame,
-  Sparkles,
   Clock,
   Play,
   Hash,
@@ -474,9 +473,9 @@ export default function AdminImportPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'COMPLETED': return 'bg-green-500/10 text-green-500 border-green-500/20'
-      case 'PROCESSING': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-      case 'FAILED': return 'bg-red-500/10 text-red-500 border-red-500/20'
+      case 'COMPLETED': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+      case 'PROCESSING': return 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+      case 'FAILED': return 'bg-destructive/10 text-destructive border-destructive/20'
       default: return 'bg-muted text-muted-foreground'
     }
   }
@@ -489,8 +488,8 @@ export default function AdminImportPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-              <Sparkles className="h-7 w-7 text-primary" />
+            <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+              <Download className="h-5 w-5 text-primary" />
               Import GIFs
             </h1>
             <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
@@ -508,7 +507,7 @@ export default function AdminImportPage() {
 
         {/* Stats Bar */}
         {(importStats.totalImported > 0 || importProgress) && (
-          <div className="mb-6 p-3 rounded-xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-pink-500/10 border border-primary/20">
+          <div className="mb-6 p-3 rounded-md bg-muted border border-border">
             <div className="flex flex-wrap items-center justify-between gap-3">
               {importProgress ? (
                 <div className="flex items-center gap-3">
@@ -554,7 +553,7 @@ export default function AdminImportPage() {
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-4">
             {/* Source Tabs + Search */}
-            <Card className="border-border/50 overflow-hidden">
+            <Card className="overflow-hidden">
               <div className="p-4 space-y-4">
                 {/* Source Tabs */}
                 <Tabs value={activeTab} onValueChange={(tab) => {
@@ -597,7 +596,7 @@ export default function AdminImportPage() {
 
                 {/* URL Import Dropdown */}
                 {showUrlImport && (
-                  <div className="p-4 bg-muted/50 rounded-lg border border-border/50 space-y-3">
+                  <div className="p-4 bg-muted rounded-md border border-border space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-sm font-medium">Import from URLs</Label>
                       <Button variant="ghost" size="sm" onClick={() => setShowUrlImport(false)} className="h-7 w-7 p-0">
@@ -716,16 +715,16 @@ export default function AdminImportPage() {
 
               {/* Results */}
               {(previews.length > 0 || isSearching) && (
-                <div className="border-t border-border/50">
+                <div className="border-t border-border">
                   {/* Import Actions Bar */}
                   {previews.length > 0 && (
-                    <div className="p-3 bg-muted/30 border-b border-border/50 flex flex-wrap items-center justify-between gap-3">
+                    <div className="p-3 bg-muted/50 border-b border-border flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-3 text-sm">
                         <span className="text-muted-foreground">
                           {previews.length} results
                         </span>
                         {newCount > 0 && (
-                          <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20">
+                          <Badge variant="default" className="bg-emerald-500/10 text-emerald-500">
                             {newCount} new
                           </Badge>
                         )}
@@ -741,7 +740,7 @@ export default function AdminImportPage() {
                           onClick={() => handleImport()}
                           disabled={isImporting || newCount === 0}
                           size="sm"
-                          className="bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90"
+                          className="bg-primary hover:bg-primary/90"
                         >
                           {isImporting ? (
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -792,7 +791,7 @@ export default function AdminImportPage() {
 
                   {/* Pagination */}
                   {pagination.hasNextPage && (
-                    <div className="p-3 border-t border-border/50 flex items-center justify-center gap-2">
+                    <div className="p-3 border-t border-border flex items-center justify-center gap-2">
                       <Button
                         variant="outline"
                         onClick={() => handleSearch(searchQuery, true)}
@@ -821,11 +820,11 @@ export default function AdminImportPage() {
 
               {/* Empty State */}
               {!previews.length && !isSearching && (
-                <div className="p-12 text-center border-t border-border/50">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                    <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                <div className="p-12 text-center border-t border-border">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-md bg-muted mb-3">
+                    <ImageIcon className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <h3 className="text-lg font-medium mb-2">Search or load trending</h3>
+                  <h3 className="text-base font-medium mb-1">Search or load trending</h3>
                   <p className="text-sm text-muted-foreground mb-4">
                     Find GIFs from {activeTab === 'tenor' ? 'Tenor' : activeTab === 'giphy' ? 'Giphy' : 'Klipy'} to import
                   </p>
@@ -841,7 +840,7 @@ export default function AdminImportPage() {
           {/* Sidebar */}
           <div className="space-y-4">
             {/* Recent Imports */}
-            <Card className="border-border/50">
+            <Card>
               <CardHeader className="p-4 pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -873,7 +872,7 @@ export default function AdminImportPage() {
                     importJobs.slice(0, 6).map((job) => (
                       <div
                         key={job.id}
-                        className="p-2.5 rounded-lg border border-border/50 bg-card/50 space-y-1.5"
+                        className="p-2.5 rounded-md border border-border bg-card space-y-1.5"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs">{getSourceIcon(job.source)}</span>
@@ -883,8 +882,8 @@ export default function AdminImportPage() {
                         </div>
                         <p className="text-xs font-medium truncate">{job.query}</p>
                         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                          <span className="text-green-500">✓{job.importedItems}</span>
-                          <span className="text-red-500">✗{job.failedItems}</span>
+                          <span className="text-emerald-500">+{job.importedItems}</span>
+                          <span className="text-destructive">-{job.failedItems}</span>
                           <span>/{job.totalItems}</span>
                         </div>
                       </div>
@@ -954,7 +953,7 @@ function GifGrid({ previews, isLoading, hoveredGif, setHoveredGif }: GifGridProp
           
           {/* Imported Badge */}
           {gif.alreadyImported && (
-            <div className="absolute top-1.5 right-1.5 bg-green-500 rounded-full p-0.5">
+            <div className="absolute top-1.5 right-1.5 bg-emerald-500 rounded-md p-0.5">
               <CheckCircle className="h-3 w-3 text-white" />
             </div>
           )}
@@ -972,7 +971,7 @@ function GifGrid({ previews, isLoading, hoveredGif, setHoveredGif }: GifGridProp
           
           {/* Play indicator for videos */}
           {gif.mp4Preview && hoveredGif !== gif.id && (
-            <div className="absolute bottom-1.5 right-1.5 bg-black/60 rounded-full p-1">
+            <div className="absolute bottom-1.5 right-1.5 bg-black/60 rounded-md p-1">
               <Play className="h-2.5 w-2.5 text-white fill-white" />
             </div>
           )}

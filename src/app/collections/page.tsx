@@ -1,7 +1,7 @@
 import { Header } from '@/components/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { FolderOpen, Lock, Pin } from 'lucide-react'
+import { Pin } from 'lucide-react'
 import Link from 'next/link'
 import prisma from '@/lib/prisma'
 
@@ -38,28 +38,26 @@ export default async function CollectionsPage() {
       <Header />
       
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center gap-3 mb-8">
-          <FolderOpen className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Collections</h1>
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold mb-1">Collections</h1>
+          <p className="text-sm text-muted-foreground">Browse curated GIF collections</p>
         </div>
 
         {collections.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <FolderOpen className="h-16 w-16 mb-4 opacity-50" />
-            <p className="text-lg">No public collections yet</p>
-            <p className="text-sm">Be the first to create one!</p>
+            <p className="text-base">No public collections yet</p>
+            <p className="text-sm mt-1">Be the first to create one!</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {collections.map((collection: typeof collections[number]) => (
               <Link key={collection.id} href={`/collection/${collection.id}`}>
-                <Card className={`hover:border-primary/50 transition-colors cursor-pointer h-full ${collection.isGlobal ? 'border-yellow-500/50' : ''}`}>
+                <Card className={`hover:border-primary/50 transition-colors cursor-pointer h-full ${collection.isGlobal ? 'border-primary/30' : ''}`}>
                   <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <FolderOpen className="h-5 w-5 text-primary" />
+                    <CardTitle className="flex items-center gap-2 text-base">
                       {collection.name}
                       {collection.isGlobal && (
-                        <Pin className="h-4 w-4 text-yellow-500" />
+                        <Pin className="h-3.5 w-3.5 text-primary" />
                       )}
                     </CardTitle>
                   </CardHeader>
@@ -75,7 +73,7 @@ export default async function CollectionsPage() {
                           {collection._count.gifs} GIFs
                         </Badge>
                         {collection.isGlobal && (
-                          <Badge variant="outline" className="text-yellow-500 border-yellow-500">
+                          <Badge variant="outline">
                             Featured
                           </Badge>
                         )}

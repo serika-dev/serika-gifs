@@ -1,8 +1,6 @@
 import { Header } from '@/components/header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { FolderOpen, Lock, Globe, ArrowLeft } from 'lucide-react'
+import { Globe, Lock, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
@@ -94,18 +92,17 @@ export default async function CollectionPage({ params }: Props) {
         </Link>
 
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <FolderOpen className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">{collection.name}</h1>
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-2xl font-semibold">{collection.name}</h1>
             {collection.isPublic ? (
-              <Globe className="h-5 w-5 text-muted-foreground" />
+              <Globe className="h-4 w-4 text-muted-foreground" />
             ) : (
-              <Lock className="h-5 w-5 text-muted-foreground" />
+              <Lock className="h-4 w-4 text-muted-foreground" />
             )}
           </div>
           
           {collection.description && (
-            <p className="text-muted-foreground mb-4">{collection.description}</p>
+            <p className="text-sm text-muted-foreground mb-4">{collection.description}</p>
           )}
           
           <div className="flex items-center gap-4">
@@ -118,8 +115,7 @@ export default async function CollectionPage({ params }: Props) {
 
         {gifs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <FolderOpen className="h-16 w-16 mb-4 opacity-50" />
-            <p className="text-lg">This collection is empty</p>
+            <p className="text-base">This collection is empty</p>
           </div>
         ) : (
           <GifGrid initialGifs={gifs} />

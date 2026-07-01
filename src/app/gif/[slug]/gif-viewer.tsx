@@ -167,8 +167,8 @@ export function GifViewer({ gif }: GifViewerProps) {
   }
 
   return (
-    <Card className="overflow-hidden border-border/50">
-      <div className="relative bg-muted flex items-center justify-center min-h-[250px] sm:min-h-[300px]">
+    <Card className="overflow-hidden p-0 gap-0">
+      <div className="relative bg-muted flex items-center justify-center min-h-[250px]">
         {showVideo ? (
           <video
             ref={videoRef}
@@ -177,13 +177,13 @@ export function GifViewer({ gif }: GifViewerProps) {
             loop
             muted
             playsInline
-            className="max-w-full max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] object-contain w-auto h-auto"
+            className="max-w-full max-h-[50vh] lg:max-h-[70vh] object-contain w-auto h-auto"
           />
         ) : (
           <img
             src={gif.url}
             alt={gif.title}
-            className="max-w-full max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] object-contain w-auto h-auto"
+            className="max-w-full max-h-[50vh] lg:max-h-[70vh] object-contain w-auto h-auto"
           />
         )}
         
@@ -223,14 +223,14 @@ export function GifViewer({ gif }: GifViewerProps) {
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 p-3 sm:p-4 border-t border-border/50">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-3 border-t border-border">
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <Button
             variant={isFavorited ? 'default' : 'outline'}
             size="sm"
             onClick={toggleFavorite}
             disabled={isLoading}
-            className={`flex-1 sm:flex-none ${isFavorited ? 'bg-red-500 hover:bg-red-600' : ''}`}
+            className={isFavorited ? 'bg-destructive hover:bg-destructive/90' : ''}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

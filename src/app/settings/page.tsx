@@ -27,7 +27,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { 
-  Settings, 
   User, 
   Key, 
   Bell, 
@@ -263,9 +262,8 @@ export default function SettingsPage() {
       <Header />
       
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex items-center gap-3 mb-8">
-          <Settings className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Settings</h1>
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold">Settings</h1>
         </div>
 
         <Tabs defaultValue="profile" className="space-y-6">
@@ -369,12 +367,12 @@ export default function SettingsPage() {
                       return (
                         <div
                           key={key.id}
-                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                          className="flex items-center justify-between p-3 bg-muted rounded-md"
                         >
                           <div className="space-y-1 flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="font-medium">{key.name}</p>
-                              <span className={`text-xs px-2 py-0.5 rounded-full text-white ${tierInfo.color}`}>
+                              <span className={`text-xs px-2 py-0.5 rounded-md text-white ${tierInfo.color}`}>
                                 {tierInfo.name} ({tierInfo.limit})
                               </span>
                               {isAdmin && key.tier !== key.effectiveTier && (
@@ -443,11 +441,11 @@ export default function SettingsPage() {
                   <div>
                     <h4 className="text-sm font-medium mb-2">Rate Limits</h4>
                     <div className="text-sm text-muted-foreground space-y-1">
-                      <p><span className="inline-block w-3 h-3 rounded-full bg-zinc-500 mr-2"></span><strong>Tier 1:</strong> 1,000 requests/hour (default)</p>
-                      <p><span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span><strong>Tier 2:</strong> 10,000 requests/hour (request upgrade)</p>
-                      <p><span className="inline-block w-3 h-3 rounded-full bg-purple-500 mr-2"></span><strong>Tier 3:</strong> 100,000 requests/hour (request upgrade)</p>
-                      <p><span className="inline-block w-3 h-3 rounded-full bg-amber-500 mr-2"></span><strong>Tier 4:</strong> 1,000,000 requests/hour (request upgrade)</p>
-                      <p><span className="inline-block w-3 h-3 rounded-full bg-emerald-500 mr-2"></span><strong>Tier 5:</strong> Unlimited (strict <Link href="/guidelines" className="text-primary hover:underline">guidelines</Link> apply)</p>
+                      <p><span className="inline-block w-3 h-3 rounded-md bg-zinc-500 mr-2"></span><strong>Tier 1:</strong> 1,000 requests/hour (default)</p>
+                      <p><span className="inline-block w-3 h-3 rounded-md bg-blue-500 mr-2"></span><strong>Tier 2:</strong> 10,000 requests/hour (request upgrade)</p>
+                      <p><span className="inline-block w-3 h-3 rounded-md bg-purple-500 mr-2"></span><strong>Tier 3:</strong> 100,000 requests/hour (request upgrade)</p>
+                      <p><span className="inline-block w-3 h-3 rounded-md bg-amber-500 mr-2"></span><strong>Tier 4:</strong> 1,000,000 requests/hour (request upgrade)</p>
+                      <p><span className="inline-block w-3 h-3 rounded-md bg-emerald-500 mr-2"></span><strong>Tier 5:</strong> Unlimited (strict <Link href="/guidelines" className="text-primary hover:underline">guidelines</Link> apply)</p>
                     </div>
                   </div>
                   <div>
@@ -595,7 +593,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label>Current Tier</Label>
                 <div className="flex items-center gap-2">
-                  <span className={`inline-block w-3 h-3 rounded-full ${TIER_INFO[selectedKeyForUpgrade?.effectiveTier || 'TIER_1']?.color}`}></span>
+                  <span className={`inline-block w-3 h-3 rounded-md ${TIER_INFO[selectedKeyForUpgrade?.effectiveTier || 'TIER_1']?.color}`}></span>
                   <span>{TIER_INFO[selectedKeyForUpgrade?.effectiveTier || 'TIER_1']?.name}</span>
                   <span className="text-muted-foreground">({TIER_INFO[selectedKeyForUpgrade?.effectiveTier || 'TIER_1']?.limit})</span>
                 </div>
@@ -611,7 +609,7 @@ export default function SettingsPage() {
                     {selectedKeyForUpgrade && getAvailableTiers(selectedKeyForUpgrade.effectiveTier).map((tier) => (
                       <SelectItem key={tier} value={tier}>
                         <div className="flex items-center gap-2">
-                          <span className={`inline-block w-2 h-2 rounded-full ${TIER_INFO[tier]?.color}`}></span>
+                          <span className={`inline-block w-2 h-2 rounded-md ${TIER_INFO[tier]?.color}`}></span>
                           {TIER_INFO[tier]?.name} ({TIER_INFO[tier]?.limit})
                         </div>
                       </SelectItem>

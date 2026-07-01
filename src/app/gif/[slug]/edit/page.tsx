@@ -204,10 +204,10 @@ export default function EditGifPage({ params }: { params: Promise<{ slug: string
           Back to GIF
         </Link>
 
-        <Card className="border-border/50">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Pencil className="h-5 w-5" />
+              <Pencil className="h-4 w-4" />
               Edit GIF
             </CardTitle>
             <CardDescription>
@@ -216,7 +216,7 @@ export default function EditGifPage({ params }: { params: Promise<{ slug: string
           </CardHeader>
           <CardContent>
             {/* Preview */}
-            <div className="mb-6 rounded-lg overflow-hidden bg-muted border border-border/50">
+            <div className="mb-6 rounded-md overflow-hidden bg-muted border border-border">
               <img
                 src={gif.url}
                 alt={gif.title}
@@ -234,7 +234,6 @@ export default function EditGifPage({ params }: { params: Promise<{ slug: string
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="GIF title"
                   required
-                  className="bg-background/50"
                 />
               </div>
 
@@ -246,14 +245,14 @@ export default function EditGifPage({ params }: { params: Promise<{ slug: string
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Optional description"
-                  className="bg-background/50 min-h-[100px]"
+                  className="min-h-[100px]"
                 />
               </div>
 
               {/* Tags */}
               <div className="space-y-2">
                 <Label htmlFor="tags">Tags</Label>
-                <div className="flex flex-wrap gap-2 p-2 min-h-[42px] bg-background/50 border border-input rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                <div className="flex flex-wrap gap-2 p-2 min-h-[42px] border border-input rounded-md focus-within:ring-2 focus-within:ring-ring">
                   {tags.map((tag) => (
                     <Badge 
                       key={tag} 

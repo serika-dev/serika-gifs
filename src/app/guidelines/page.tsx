@@ -101,10 +101,10 @@ export default function GuidelinesPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-12 max-w-4xl">
-        <h1 className="text-3xl font-bold mb-2">Usage Guidelines</h1>
-        <p className="text-muted-foreground mb-8">Last updated: January 29, 2026</p>
+        <h1 className="text-2xl font-semibold mb-2">Usage Guidelines</h1>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: January 29, 2026</p>
 
-        <div className="prose prose-invert prose-zinc max-w-none space-y-8">
+        <div className="prose prose-zinc max-w-none space-y-8">
           <section>
             <h2 className="text-xl font-semibold mb-4">Overview</h2>
             <p className="text-muted-foreground leading-relaxed">
@@ -120,11 +120,11 @@ export default function GuidelinesPage() {
             <h2 className="text-xl font-semibold mb-6">Tier Requirements</h2>
             <div className="space-y-4">
               {TIER_REQUIREMENTS.map((tier) => (
-                <Card key={tier.tier} className="border-border/50">
+                <Card key={tier.tier}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${tier.color} text-white`}>
+                        <div className={`p-2 rounded-md ${tier.color} text-white`}>
                           {tier.icon}
                         </div>
                         <div>
@@ -180,9 +180,9 @@ export default function GuidelinesPage() {
             <div className="text-muted-foreground leading-relaxed space-y-4">
               <p>All users, regardless of tier, must comply with our content policy. The following is prohibited:</p>
               
-              <Card className="border-red-500/30 bg-red-500/5">
+              <Card className="border-destructive/30 bg-destructive/5">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base text-red-500 flex items-center gap-2">
+                  <CardTitle className="text-base text-destructive flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
                     Prohibited Content
                   </CardTitle>
@@ -251,10 +251,10 @@ export default function GuidelinesPage() {
             <div className="text-muted-foreground leading-relaxed space-y-4">
               <div>
                 <h3 className="text-lg font-medium text-foreground mb-2">Tier 3: Basic Attribution</h3>
-                <Card className="border-border/50 bg-muted/30">
+                <Card className="bg-muted">
                   <CardContent className="py-4">
                     <p className="text-sm">Include a text link in your application:</p>
-                    <code className="block mt-2 text-xs bg-background p-2 rounded">
+                    <code className="block mt-2 text-xs bg-background p-2 rounded-md">
                       GIFs provided by &lt;a href=&quot;https://gifs.serika.dev&quot;&gt;SerikaGifs&lt;/a&gt;
                     </code>
                   </CardContent>
@@ -263,10 +263,10 @@ export default function GuidelinesPage() {
 
               <div>
                 <h3 className="text-lg font-medium text-foreground mb-2">Tier 4: Powered By Badge</h3>
-                <Card className="border-border/50 bg-muted/30">
+                <Card className="bg-muted">
                   <CardContent className="py-4">
                     <p className="text-sm">Display a &quot;Powered by&quot; badge near GIF content:</p>
-                    <div className="mt-2 flex items-center gap-2 bg-background p-2 rounded w-fit">
+                    <div className="mt-2 flex items-center gap-2 bg-background p-2 rounded-md w-fit">
                       <span className="text-xs text-muted-foreground">Powered by</span>
                       <span className="text-xs font-semibold text-primary">SerikaGifs</span>
                     </div>
@@ -276,11 +276,11 @@ export default function GuidelinesPage() {
 
               <div>
                 <h3 className="text-lg font-medium text-foreground mb-2">Tier 5: Named Integration</h3>
-                <Card className="border-border/50 bg-muted/30">
+                <Card className="bg-muted">
                   <CardContent className="py-4">
                     <p className="text-sm">Include SerikaGifs in your GIF search feature naming:</p>
                     <div className="mt-2 space-y-2">
-                      <div className="flex items-center gap-2 bg-background p-3 rounded">
+                      <div className="flex items-center gap-2 bg-background p-3 rounded-md">
                         <span className="text-sm">🔍</span>
                         <span className="text-sm text-muted-foreground">Search SerikaGifs...</span>
                       </div>

@@ -37,8 +37,8 @@ export default async function AdminPage() {
       <div className="container mx-auto py-8 px-4">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl font-semibold">Admin Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Manage your GIF sharing platform
             </p>
           </div>
@@ -49,49 +49,49 @@ export default async function AdminPage() {
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card className="border-border/50">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total GIFs</CardTitle>
               <ImageIcon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalGifs}</div>
+              <div className="text-2xl font-semibold">{stats.totalGifs}</div>
               <p className="text-xs text-muted-foreground">
                 {stats.importedGifs} imported
               </p>
             </CardContent>
           </Card>
-          <Card className="border-border/50">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Users</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalUsers}</div>
+              <div className="text-2xl font-semibold">{stats.totalUsers}</div>
               <p className="text-xs text-muted-foreground">
                 Registered users
               </p>
             </CardContent>
           </Card>
-          <Card className="border-border/50">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Import Jobs</CardTitle>
               <Download className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalImports}</div>
+              <div className="text-2xl font-semibold">{stats.totalImports}</div>
               <p className="text-xs text-muted-foreground">
                 Completed imports
               </p>
             </CardContent>
           </Card>
-          <Card className="border-border/50">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Storage</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">B2</div>
+              <div className="text-2xl font-semibold">B2</div>
               <p className="text-xs text-muted-foreground">
                 Backblaze connected
               </p>
@@ -102,9 +102,9 @@ export default async function AdminPage() {
         {/* Quick Actions */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Link href="/admin/import">
-            <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
               <CardHeader>
-                <Download className="h-8 w-8 text-primary mb-2" />
+                <Download className="h-6 w-6 text-primary mb-1" />
                 <CardTitle>Import GIFs</CardTitle>
                 <CardDescription>
                   Import GIFs from Tenor, Giphy, and Klipy
@@ -114,9 +114,9 @@ export default async function AdminPage() {
           </Link>
 
           <Link href="/admin/users">
-            <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
               <CardHeader>
-                <Users className="h-8 w-8 text-primary mb-2" />
+                <Users className="h-6 w-6 text-primary mb-1" />
                 <CardTitle>Manage Users</CardTitle>
                 <CardDescription>
                   View and manage user accounts
@@ -126,9 +126,9 @@ export default async function AdminPage() {
           </Link>
 
           <Link href="/admin/quotas">
-            <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
               <CardHeader>
-                <ArrowUpCircle className="h-8 w-8 text-primary mb-2" />
+                <ArrowUpCircle className="h-6 w-6 text-primary mb-1" />
                 <CardTitle>Quota Requests</CardTitle>
                 <CardDescription>
                   Review API key tier upgrade requests
@@ -138,9 +138,9 @@ export default async function AdminPage() {
           </Link>
 
           <Link href="/admin/dmca">
-            <Card className="border-border/50 hover:border-red-500/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:border-destructive/50 transition-colors cursor-pointer h-full">
               <CardHeader>
-                <Shield className="h-8 w-8 text-red-500 mb-2" />
+                <Shield className="h-6 w-6 text-destructive mb-1" />
                 <CardTitle>DMCA Requests</CardTitle>
                 <CardDescription>
                   Handle copyright takedown requests
@@ -150,9 +150,9 @@ export default async function AdminPage() {
           </Link>
 
           <Link href="/admin/api-keys">
-            <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
               <CardHeader>
-                <Key className="h-8 w-8 text-primary mb-2" />
+                <Key className="h-6 w-6 text-primary mb-1" />
                 <CardTitle>API Keys</CardTitle>
                 <CardDescription>
                   Manage API keys for external services
@@ -162,9 +162,9 @@ export default async function AdminPage() {
           </Link>
 
           <Link href="/admin/settings">
-            <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
               <CardHeader>
-                <Settings className="h-8 w-8 text-primary mb-2" />
+                <Settings className="h-6 w-6 text-primary mb-1" />
                 <CardTitle>Settings</CardTitle>
                 <CardDescription>
                   Configure platform settings

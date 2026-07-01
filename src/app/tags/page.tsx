@@ -36,26 +36,26 @@ export default async function TagsPage() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Tags</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-semibold mb-1">Tags</h1>
+          <p className="text-sm text-muted-foreground">
             Browse GIFs by tag
           </p>
         </div>
 
         {tags.length === 0 ? (
-          <p className="text-muted-foreground text-center py-12">
+          <p className="text-muted-foreground text-center py-16">
             No tags yet. Upload some GIFs with tags to get started!
           </p>
         ) : (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             {tags.map((tag) => (
               <Link key={tag.slug} href={`/tag/${tag.slug}`}>
                 <Badge
                   variant="secondary"
-                  className="cursor-pointer hover:bg-primary/20 transition-colors text-base px-4 py-2"
+                  className="cursor-pointer hover:bg-accent transition-colors text-sm py-1.5 px-3"
                 >
-                  #{tag.name}
-                  <span className="ml-2 text-muted-foreground">({tag.count})</span>
+                  {tag.name}
+                  <span className="ml-1.5 text-muted-foreground">{tag.count}</span>
                 </Badge>
               </Link>
             ))}

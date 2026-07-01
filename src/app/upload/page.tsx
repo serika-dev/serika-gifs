@@ -130,10 +130,10 @@ export default function UploadPage() {
       <Header />
 
       <main className="container mx-auto px-4 py-8 max-w-3xl">
-        <Card className="border-border/50">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
+              <Upload className="h-4 w-4" />
               Upload GIF
             </CardTitle>
             <CardDescription>
@@ -155,7 +155,7 @@ export default function UploadPage() {
 
                 {preview ? (
                   <div className="relative mt-2">
-                    <div className="relative rounded-lg overflow-hidden bg-muted border border-border/50">
+                    <div className="relative rounded-md overflow-hidden bg-muted border border-border">
                       {file?.type.startsWith('video/') ? (
                         <video
                           src={preview}
@@ -189,7 +189,7 @@ export default function UploadPage() {
                 ) : (
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="mt-2 border-2 border-dashed border-border/50 rounded-lg p-12 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                    className="mt-2 border-2 border-dashed border-border rounded-md p-12 text-center cursor-pointer hover:border-primary/50 transition-colors"
                   >
                     <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <p className="text-muted-foreground mb-2">
@@ -213,7 +213,6 @@ export default function UploadPage() {
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Give your GIF a title"
                   required
-                  className="bg-background/50"
                 />
               </div>
 
@@ -225,14 +224,13 @@ export default function UploadPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Optional description"
-                  className="bg-background/50"
                 />
               </div>
 
               {/* Tags */}
               <div className="space-y-2">
                 <Label htmlFor="tags">Tags</Label>
-                <div className="flex flex-wrap gap-2 p-2 min-h-[42px] bg-background/50 border border-input rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                <div className="flex flex-wrap gap-2 p-2 min-h-[42px] border border-input rounded-md focus-within:ring-2 focus-within:ring-ring">
                   {tags.map((tag) => (
                     <Badge 
                       key={tag} 
@@ -267,17 +265,17 @@ export default function UploadPage() {
 
               <Button
                 type="submit"
-                className="w-full bg-primary hover:bg-primary/90"
+                className="w-full"
                 disabled={isUploading || !file}
               >
                 {isUploading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4" />
                     Uploading...
                   </>
                 ) : (
                   <>
-                    <Upload className="mr-2 h-4 w-4" />
+                    <Upload className="h-4 w-4" />
                     Upload GIF
                   </>
                 )}

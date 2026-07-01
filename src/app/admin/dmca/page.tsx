@@ -59,7 +59,7 @@ interface DmcaRequest {
 const STATUS_CONFIG = {
   PENDING: {
     label: 'Pending',
-    color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+    color: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
     icon: Clock,
   },
   PROCESSING: {
@@ -69,12 +69,12 @@ const STATUS_CONFIG = {
   },
   COMPLETED: {
     label: 'Completed',
-    color: 'bg-green-500/10 text-green-500 border-green-500/20',
+    color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
     icon: CheckCircle2,
   },
   REJECTED: {
     label: 'Rejected',
-    color: 'bg-red-500/10 text-red-500 border-red-500/20',
+    color: 'bg-destructive/10 text-destructive border-destructive/20',
     icon: XCircle,
   },
   COUNTER_FILED: {
@@ -174,11 +174,11 @@ export default function AdminDmcaPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Shield className="h-8 w-8 text-red-500" />
+          <h1 className="text-xl font-semibold flex items-center gap-2">
+            <Shield className="h-5 w-5 text-destructive" />
             DMCA Requests
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Manage copyright takedown requests
           </p>
         </div>
@@ -189,9 +189,9 @@ export default function AdminDmcaPage() {
       </div>
 
       {pendingCount > 0 && (
-        <Card className="border-yellow-500/20 bg-yellow-500/5">
+        <Card className="border-amber-500/20 bg-amber-500/5">
           <CardContent className="flex items-center gap-4 py-4">
-            <AlertTriangle className="h-6 w-6 text-yellow-500" />
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
             <div>
               <p className="font-medium">
                 {pendingCount} pending request{pendingCount > 1 ? 's' : ''} require
@@ -228,8 +228,7 @@ export default function AdminDmcaPage() {
       ) : requests.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Shield className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No DMCA requests found</p>
+            <p className="text-sm text-muted-foreground">No DMCA requests found</p>
           </CardContent>
         </Card>
       ) : (
@@ -310,7 +309,7 @@ export default function AdminDmcaPage() {
                     </div>
 
                     {request.status === 'COMPLETED' && (
-                      <div className="flex items-center gap-2 text-sm text-green-500">
+                      <div className="flex items-center gap-2 text-sm text-emerald-500">
                         <CheckCircle2 className="h-4 w-4" />
                         <span>
                           {request.removedCount} item(s) removed on{' '}
@@ -469,7 +468,7 @@ export default function AdminDmcaPage() {
       <Dialog open={processDialogOpen} onOpenChange={setProcessDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-500">
+            <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
               Confirm Takedown
             </DialogTitle>
@@ -481,8 +480,8 @@ export default function AdminDmcaPage() {
           {selectedRequest && (
             <div className="space-y-4">
               {selectedRequest.tagSlug && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-                  <p className="font-medium text-red-500">Tag Takedown</p>
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+                  <p className="font-medium text-destructive">Tag Takedown</p>
                   <p className="text-sm text-muted-foreground">
                     All GIFs tagged with <span className="font-mono">#{selectedRequest.tagSlug}</span> will be deleted.
                   </p>
@@ -490,8 +489,8 @@ export default function AdminDmcaPage() {
               )}
 
               {selectedRequest.infringingUrls.length > 0 && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-                  <p className="font-medium text-red-500">URL Takedown</p>
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+                  <p className="font-medium text-destructive">URL Takedown</p>
                   <p className="text-sm text-muted-foreground">
                     {selectedRequest.infringingUrls.length} GIF(s) will be deleted.
                   </p>

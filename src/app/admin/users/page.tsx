@@ -187,8 +187,8 @@ export default function AdminUsersPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-              <Users className="h-7 w-7 text-primary" />
+            <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
               Manage Users
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -211,7 +211,7 @@ export default function AdminUsersPage() {
         </div>
 
         {/* Search */}
-        <Card className="mb-6 border-border/50">
+        <Card className="mb-6">
           <CardContent className="p-4">
             <form onSubmit={handleSearch} className="flex gap-2">
               <div className="flex-1 relative">
@@ -231,13 +231,13 @@ export default function AdminUsersPage() {
         </Card>
 
         {/* Users List */}
-        <Card className="border-border/50">
+        <Card className="">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Users</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="divide-y divide-border/50">
+              <div className="divide-y divide-border">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="p-4 flex items-center gap-4">
                     <Skeleton className="h-10 w-10 rounded-full" />
@@ -250,15 +250,14 @@ export default function AdminUsersPage() {
               </div>
             ) : users.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No users found</p>
+                <p className="text-sm">No users found</p>
               </div>
             ) : (
-              <div className="divide-y divide-border/50">
+              <div className="divide-y divide-border">
                 {users.map((user) => (
                   <div
                     key={user.id}
-                    className="p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors"
+                    className="p-4 flex items-center gap-4 hover:bg-muted/50 transition-colors"
                   >
                     {/* Avatar */}
                     <Avatar className="h-10 w-10">
@@ -339,7 +338,7 @@ export default function AdminUsersPage() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="text-red-500 focus:text-red-500"
+                          className="text-destructive focus:text-destructive"
                           onClick={() => {
                             setSelectedUser(user)
                             setShowDeleteDialog(true)
@@ -357,7 +356,7 @@ export default function AdminUsersPage() {
 
             {/* Pagination */}
             {pagination.totalPages > 1 && (
-              <div className="p-4 border-t border-border/50 flex items-center justify-between">
+              <div className="p-4 border-t border-border flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
                   Page {pagination.page} of {pagination.totalPages}
                 </p>
@@ -400,7 +399,7 @@ export default function AdminUsersPage() {
               <AlertDialogAction
                 onClick={handleDeleteUser}
                 disabled={isDeleting}
-                className="bg-red-500 hover:bg-red-600"
+                className="bg-destructive hover:bg-destructive/90"
               >
                 {isDeleting ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />

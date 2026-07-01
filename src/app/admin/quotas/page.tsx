@@ -169,7 +169,7 @@ export default function AdminQuotasPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold">Quota Requests</h1>
+              <h1 className="text-xl font-semibold">Quota Requests</h1>
               <p className="text-muted-foreground text-sm">
                 Manage API key tier upgrade requests
               </p>
@@ -181,7 +181,7 @@ export default function AdminQuotasPage() {
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <Card 
-              className={`border-border/50 cursor-pointer transition-colors ${filter === 'PENDING' ? 'ring-2 ring-amber-500/50' : 'hover:border-amber-500/30'}`}
+              className={`cursor-pointer transition-colors ${filter === 'PENDING' ? 'ring-2 ring-amber-500/50' : 'hover:border-amber-500/30'}`}
               onClick={() => setFilter('PENDING')}
             >
               <CardContent className="p-4">
@@ -195,7 +195,7 @@ export default function AdminQuotasPage() {
               </CardContent>
             </Card>
             <Card 
-              className={`border-border/50 cursor-pointer transition-colors ${filter === 'APPROVED' ? 'ring-2 ring-emerald-500/50' : 'hover:border-emerald-500/30'}`}
+              className={`cursor-pointer transition-colors ${filter === 'APPROVED' ? 'ring-2 ring-emerald-500/50' : 'hover:border-emerald-500/30'}`}
               onClick={() => setFilter('APPROVED')}
             >
               <CardContent className="p-4">
@@ -209,7 +209,7 @@ export default function AdminQuotasPage() {
               </CardContent>
             </Card>
             <Card 
-              className={`border-border/50 cursor-pointer transition-colors ${filter === 'DENIED' ? 'ring-2 ring-red-500/50' : 'hover:border-red-500/30'}`}
+              className={`cursor-pointer transition-colors ${filter === 'DENIED' ? 'ring-2 ring-red-500/50' : 'hover:border-red-500/30'}`}
               onClick={() => setFilter('DENIED')}
             >
               <CardContent className="p-4">
@@ -223,7 +223,7 @@ export default function AdminQuotasPage() {
               </CardContent>
             </Card>
             <Card 
-              className={`border-border/50 cursor-pointer transition-colors ${filter === 'all' ? 'ring-2 ring-primary/50' : 'hover:border-primary/30'}`}
+              className={`cursor-pointer transition-colors ${filter === 'all' ? 'ring-2 ring-primary/50' : 'hover:border-primary/30'}`}
               onClick={() => setFilter('all')}
             >
               <CardContent className="p-4">
@@ -240,7 +240,7 @@ export default function AdminQuotasPage() {
         )}
 
         {/* Requests List */}
-        <Card className="border-border/50">
+        <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-lg">
               {filter === 'all' ? 'All Requests' : `${filter.charAt(0) + filter.slice(1).toLowerCase()} Requests`}
@@ -258,15 +258,14 @@ export default function AdminQuotasPage() {
               </div>
             ) : requests.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <p>No {filter === 'all' ? '' : filter.toLowerCase()} quota requests</p>
+                <p className="text-sm">No {filter === 'all' ? '' : filter.toLowerCase()} quota requests</p>
               </div>
             ) : (
               <div className="space-y-4">
                 {requests.map((request) => (
                   <div
                     key={request.id}
-                    className="border border-border/50 rounded-lg p-4 hover:border-border transition-colors"
+                    className="border border-border rounded-md p-4 hover:border-primary/30 transition-colors"
                   >
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                       {/* Left side - User & Request info */}
@@ -294,13 +293,13 @@ export default function AdminQuotasPage() {
                           </div>
                         </div>
 
-                        <div className="bg-muted/30 rounded-md p-3 mb-3">
+                        <div className="bg-muted rounded-md p-3 mb-3">
                           <p className="text-sm text-muted-foreground mb-1 font-medium">Reason:</p>
                           <p className="text-sm">{request.reason}</p>
                         </div>
 
                         {request.adminNote && (
-                          <div className="bg-muted/30 rounded-md p-3 border-l-2 border-primary">
+                          <div className="bg-muted rounded-md p-3 border-l-2 border-primary">
                             <p className="text-sm text-muted-foreground mb-1 font-medium">Admin Note:</p>
                             <p className="text-sm">{request.adminNote}</p>
                           </div>
@@ -320,16 +319,16 @@ export default function AdminQuotasPage() {
                             className="bg-emerald-500 hover:bg-emerald-600 text-white"
                             onClick={() => openActionDialog(request, 'approve')}
                           >
-                            <Check className="h-4 w-4 mr-1" />
+                            <Check className="h-4 w-4" />
                             Approve
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
-                            className="border-red-500/50 text-red-500 hover:bg-red-500/10"
+                            className="border-destructive/50 text-destructive hover:bg-destructive/10"
                             onClick={() => openActionDialog(request, 'deny')}
                           >
-                            <X className="h-4 w-4 mr-1" />
+                            <X className="h-4 w-4" />
                             Deny
                           </Button>
                         </div>
@@ -383,7 +382,7 @@ export default function AdminQuotasPage() {
                 disabled={actionLoading}
                 className={dialogAction === 'approve' 
                   ? 'bg-emerald-500 hover:bg-emerald-600' 
-                  : 'bg-red-500 hover:bg-red-600'}
+                  : 'bg-destructive hover:bg-destructive/90'}
               >
                 {actionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {dialogAction === 'approve' ? 'Approve & Upgrade' : 'Deny Request'}

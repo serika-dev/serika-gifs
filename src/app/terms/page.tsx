@@ -11,10 +11,10 @@ export default function TermsPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-12 max-w-3xl">
-        <h1 className="text-3xl font-bold mb-2">Terms of Service</h1>
-        <p className="text-muted-foreground mb-8">Last updated: January 29, 2026</p>
+        <h1 className="text-2xl font-semibold mb-2">Terms of Service</h1>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: January 29, 2026</p>
 
-        <div className="prose prose-invert prose-zinc max-w-none space-y-8">
+        <div className="prose prose-zinc max-w-none space-y-8">
           <section>
             <h2 className="text-xl font-semibold mb-4">1. Agreement to Terms</h2>
             <p className="text-muted-foreground leading-relaxed">

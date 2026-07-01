@@ -14,7 +14,6 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   TrendingUp,
-  Flame,
   Clock,
   Heart,
   Eye,
@@ -74,37 +73,30 @@ export default function TrendingPage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
+      <main className="container mx-auto px-4 py-8">
         {/* Page Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl bg-primary/10">
-              <SortIcon className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold">
-                {currentSort?.label || 'Trending'} GIFs
-              </h1>
-              <p className="text-sm sm:text-base text-muted-foreground">
-                {sort === 'trending' && 'The most popular GIFs right now'}
-                {sort === 'newest' && 'Fresh GIFs just uploaded'}
-                {sort === 'popular' && 'GIFs with the most favorites'}
-                {sort === 'most-viewed' && 'The most watched GIFs'}
-                {sort === 'random' && 'Random selection of GIFs'}
-              </p>
-            </div>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold mb-1">
+            {currentSort?.label || 'Trending'} GIFs
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {sort === 'trending' && 'The most popular GIFs right now'}
+            {sort === 'newest' && 'Fresh GIFs just uploaded'}
+            {sort === 'popular' && 'GIFs with the most favorites'}
+            {sort === 'most-viewed' && 'The most watched GIFs'}
+            {sort === 'random' && 'Random selection of GIFs'}
+          </p>
         </div>
 
         {/* Filters Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
           {/* Sort Tabs - Desktop */}
           <div className="hidden sm:block">
             <Tabs value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-              <TabsList className="h-10">
+              <TabsList>
                 {sortOptions.map(({ value, label, icon: Icon }) => (
-                  <TabsTrigger key={value} value={value} className="gap-2">
-                    <Icon className="h-4 w-4" />
+                  <TabsTrigger key={value} value={value} className="gap-1.5">
+                    <Icon className="h-3.5 w-3.5" />
                     {label}
                   </TabsTrigger>
                 ))}
@@ -151,28 +143,22 @@ export default function TrendingPage() {
         </div>
 
         {/* Quick Filter Chips */}
-        <div className="flex gap-2 overflow-x-auto pb-4 mb-2 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-hide">
           <Link href="/tags">
-            <Badge variant="outline" className="cursor-pointer hover:bg-primary/10 whitespace-nowrap">
-              🏷️ Browse Tags
+            <Badge variant="outline" className="cursor-pointer hover:bg-accent whitespace-nowrap">
+              Browse Tags
             </Badge>
           </Link>
           <Link href="/collections">
-            <Badge variant="outline" className="cursor-pointer hover:bg-primary/10 whitespace-nowrap">
-              📁 Collections
+            <Badge variant="outline" className="cursor-pointer hover:bg-accent whitespace-nowrap">
+              Collections
             </Badge>
           </Link>
           <Link href="/favorites">
-            <Badge variant="outline" className="cursor-pointer hover:bg-primary/10 whitespace-nowrap">
-              ❤️ Favorites
+            <Badge variant="outline" className="cursor-pointer hover:bg-accent whitespace-nowrap">
+              Favorites
             </Badge>
           </Link>
-          <Badge
-            variant="outline"
-            className="cursor-pointer hover:bg-primary/10 whitespace-nowrap"
-          >
-            🔥 Hot Today
-          </Badge>
         </div>
 
         {/* GIF Grid */}
@@ -184,26 +170,22 @@ export default function TrendingPage() {
         />
 
         {/* Stats Section */}
-        <div className="mt-12 sm:mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl bg-card border border-border/50 text-center">
-            <Flame className="h-6 w-6 mx-auto mb-2 text-orange-500" />
-            <p className="text-2xl font-bold">{formatNumber(stats.trendingToday)}</p>
-            <p className="text-sm text-muted-foreground">Trending Today</p>
+        <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-4 rounded-lg bg-card border border-border text-center">
+            <p className="text-2xl font-semibold">{formatNumber(stats.trendingToday)}</p>
+            <p className="text-sm text-muted-foreground mt-1">Trending Today</p>
           </div>
-          <div className="p-4 rounded-xl bg-card border border-border/50 text-center">
-            <Eye className="h-6 w-6 mx-auto mb-2 text-blue-500" />
-            <p className="text-2xl font-bold">{formatNumber(stats.totalViews)}</p>
-            <p className="text-sm text-muted-foreground">Total Views</p>
+          <div className="p-4 rounded-lg bg-card border border-border text-center">
+            <p className="text-2xl font-semibold">{formatNumber(stats.totalViews)}</p>
+            <p className="text-sm text-muted-foreground mt-1">Total Views</p>
           </div>
-          <div className="p-4 rounded-xl bg-card border border-border/50 text-center">
-            <Heart className="h-6 w-6 mx-auto mb-2 text-pink-500" />
-            <p className="text-2xl font-bold">{formatNumber(stats.favoritesToday)}</p>
-            <p className="text-sm text-muted-foreground">Favorites Today</p>
+          <div className="p-4 rounded-lg bg-card border border-border text-center">
+            <p className="text-2xl font-semibold">{formatNumber(stats.favoritesToday)}</p>
+            <p className="text-sm text-muted-foreground mt-1">Favorites Today</p>
           </div>
-          <div className="p-4 rounded-xl bg-card border border-border/50 text-center">
-            <TrendingUp className="h-6 w-6 mx-auto mb-2 text-green-500" />
-            <p className="text-2xl font-bold">{stats.growth}</p>
-            <p className="text-sm text-muted-foreground">Growth This Week</p>
+          <div className="p-4 rounded-lg bg-card border border-border text-center">
+            <p className="text-2xl font-semibold">{stats.growth}</p>
+            <p className="text-sm text-muted-foreground mt-1">Growth This Week</p>
           </div>
         </div>
       </main>

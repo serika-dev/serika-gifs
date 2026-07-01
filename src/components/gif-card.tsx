@@ -67,7 +67,7 @@ export function GifCard({
   return (
     <Link href={`/gif/${gif.slug}`}>
       <Card
-        className="group relative aspect-square overflow-hidden border-border/50 bg-muted cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:border-primary/50 active:scale-[0.98]"
+        className="group relative aspect-square overflow-hidden border-border bg-muted cursor-pointer transition-colors duration-150 hover:border-primary/50 p-0 gap-0"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onTouchStart={() => setIsHovered(true)}
@@ -84,31 +84,31 @@ export function GifCard({
         />
         
         {/* Overlay - always visible on mobile touch */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-200">
-          <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3">
-            <p className="text-xs sm:text-sm font-medium text-white truncate">{gif.title}</p>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-150">
+          <div className="absolute bottom-0 left-0 right-0 p-2.5">
+            <p className="text-xs font-medium text-white truncate">{gif.title}</p>
             
             {showStats && (
-              <div className="flex items-center gap-2 sm:gap-3 mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-white/80">
-                <span className="flex items-center gap-0.5 sm:gap-1">
-                  <Eye className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <div className="flex items-center gap-2.5 mt-0.5 text-[10px] text-white/70">
+                <span className="flex items-center gap-0.5">
+                  <Eye className="h-3 w-3" />
                   {formatNumber(gif.views)}
                 </span>
-                <span className="flex items-center gap-0.5 sm:gap-1">
-                  <Heart className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                <span className="flex items-center gap-0.5">
+                  <Heart className="h-3 w-3" />
                   {formatNumber(favoriteCount)}
                 </span>
               </div>
             )}
           </div>
           
-          {/* Quick actions - larger touch targets on mobile */}
+          {/* Quick actions */}
           {showQuickActions && (
-            <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 flex gap-0.5 sm:gap-1 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
+            <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
               <SaveToCollection gifId={gif.id} />
-              <QuickActionButton onClick={copyUrl} icon={<Copy className="h-3 w-3 sm:h-3.5 sm:w-3.5" />} />
-              <QuickActionButton onClick={downloadGif} icon={<Download className="h-3 w-3 sm:h-3.5 sm:w-3.5" />} />
-              <QuickActionButton onClick={shareGif} icon={<Share2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />} />
+              <QuickActionButton onClick={copyUrl} icon={<Copy className="h-3 w-3" />} />
+              <QuickActionButton onClick={downloadGif} icon={<Download className="h-3 w-3" />} />
+              <QuickActionButton onClick={shareGif} icon={<Share2 className="h-3 w-3" />} />
             </div>
           )}
         </div>
@@ -128,7 +128,7 @@ function QuickActionButton({
     <Button
       size="icon"
       variant="secondary"
-      className="h-7 w-7 sm:h-7 sm:w-7 min-h-[28px] min-w-[28px] bg-black/50 hover:bg-black/70 active:bg-black/80 border-0 text-white touch-manipulation"
+      className="h-7 w-7 min-h-[28px] min-w-[28px] bg-black/50 hover:bg-black/70 border-0 text-white"
       onClick={onClick}
     >
       {icon}

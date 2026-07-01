@@ -35,16 +35,16 @@ export default async function TagPage({
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Badge variant="secondary" className="text-lg px-4 py-1">
-              #{tag.name}
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="secondary">
+              {tag.name}
             </Badge>
-            <span className="text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               {tag._count.gifs.toLocaleString()} GIFs
             </span>
           </div>
-          <p className="text-muted-foreground">
-            Explore all GIFs tagged with #{tag.name}
+          <p className="text-sm text-muted-foreground">
+            Explore all GIFs tagged with {tag.name}
           </p>
         </div>
 

@@ -139,7 +139,7 @@ export function GifGrid({
 
   if (isLoading) {
     return (
-      <div className={`grid ${gridClasses[columns]} gap-2 sm:gap-3`}>
+      <div className={`grid ${gridClasses[columns]} gap-2`}>
         {Array.from({ length: 12 }).map((_, i) => (
           <GifCardSkeleton key={i} />
         ))}
@@ -149,16 +149,16 @@ export function GifGrid({
 
   if (gifs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-muted-foreground px-4">
-        <p className="text-base sm:text-lg text-center">{emptyMessage}</p>
-        <p className="text-xs sm:text-sm text-center mt-1">{emptySubMessage}</p>
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground px-4">
+        <p className="text-base text-center">{emptyMessage}</p>
+        <p className="text-sm text-center mt-1">{emptySubMessage}</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className={`grid ${gridClasses[columns]} gap-2 sm:gap-3`}>
+    <div className="space-y-6">
+      <div className={`grid ${gridClasses[columns]} gap-2`}>
         {gifs.map((gif) => (
           <GifCard key={gif.id} gif={gif} />
         ))}

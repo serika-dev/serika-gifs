@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { FolderOpen, Plus, Lock, Globe, Loader2, Pin } from 'lucide-react'
+import { Plus, Lock, Globe, Loader2, Pin } from 'lucide-react'
 import Link from 'next/link'
 import { useRequireAuth } from '@/contexts/auth-context'
 import { toast } from 'sonner'
@@ -131,10 +131,7 @@ export default function MyCollectionsPage() {
       
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <FolderOpen className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">My Collections</h1>
-          </div>
+          <h1 className="text-2xl font-semibold">My Collections</h1>
 
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -213,9 +210,8 @@ export default function MyCollectionsPage() {
           </div>
         ) : collections.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <FolderOpen className="h-16 w-16 mb-4 opacity-50" />
-            <p className="text-lg">No collections yet</p>
-            <p className="text-sm mb-4">Create your first collection to get started!</p>
+            <p className="text-base">No collections yet</p>
+            <p className="text-sm mt-1 mb-4">Create your first collection to get started!</p>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Collection
@@ -228,16 +224,15 @@ export default function MyCollectionsPage() {
                 <Link href={`/collection/${collection.id}`}>
                   <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
                     <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <FolderOpen className="h-5 w-5 text-primary" />
+                      <CardTitle className="flex items-center gap-2 text-base">
                         {collection.name}
                         {collection.isGlobal && (
-                          <Pin className="h-4 w-4 text-yellow-500" />
+                          <Pin className="h-3.5 w-3.5 text-primary" />
                         )}
                         {collection.isPublic ? (
-                          <Globe className="h-4 w-4 text-muted-foreground" />
+                          <Globe className="h-3.5 w-3.5 text-muted-foreground" />
                         ) : (
-                          <Lock className="h-4 w-4 text-muted-foreground" />
+                          <Lock className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
                       </CardTitle>
                     </CardHeader>
@@ -252,7 +247,7 @@ export default function MyCollectionsPage() {
                           {collection._count.gifs} GIFs
                         </Badge>
                         {collection.isGlobal && (
-                          <Badge variant="outline" className="text-yellow-500 border-yellow-500">
+                          <Badge variant="outline">
                             Global
                           </Badge>
                         )}

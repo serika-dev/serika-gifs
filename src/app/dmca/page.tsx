@@ -13,10 +13,10 @@ export default function DMCAPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-12 max-w-3xl">
-        <h1 className="text-3xl font-bold mb-2">DMCA Policy</h1>
-        <p className="text-muted-foreground mb-8">Last updated: January 29, 2026</p>
+        <h1 className="text-2xl font-semibold mb-2">DMCA Policy</h1>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: January 29, 2026</p>
 
-        <div className="prose prose-invert prose-zinc max-w-none space-y-8">
+        <div className="prose prose-zinc max-w-none space-y-8">
           <section>
             <h2 className="text-xl font-semibold mb-4">1. Overview</h2>
             <p className="text-muted-foreground leading-relaxed">
@@ -29,7 +29,7 @@ export default function DMCAPage() {
 
           <section>
             <h2 className="text-xl font-semibold mb-4">2. Designated Agent</h2>
-            <Card className="border-border/50 bg-muted/30">
+            <Card className="bg-muted">
               <CardContent className="pt-6">
                 <div className="space-y-2 text-sm">
                   <p><strong>DMCA Agent for SerikaGifs</strong></p>
@@ -53,7 +53,7 @@ export default function DMCAPage() {
                 DMCA takedown notice containing the following information:
               </p>
 
-              <Card className="border-border/50">
+              <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <FileText className="h-4 w-4" />
@@ -112,10 +112,10 @@ export default function DMCAPage() {
             <h2 className="text-xl font-semibold mb-4">4. Processing of Takedown Requests</h2>
             <div className="text-muted-foreground leading-relaxed space-y-4">
               <div className="grid gap-4">
-                <Card className="border-border/50">
+                <Card>
                   <CardContent className="pt-6">
                     <div className="flex gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary text-sm font-medium shrink-0">1</div>
+                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary text-sm font-medium shrink-0">1</div>
                       <div>
                         <p className="font-medium">Receipt & Review</p>
                         <p className="text-sm text-muted-foreground">We review the notice for completeness and validity within 24-48 hours.</p>
@@ -123,10 +123,10 @@ export default function DMCAPage() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="border-border/50">
+                <Card>
                   <CardContent className="pt-6">
                     <div className="flex gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary text-sm font-medium shrink-0">2</div>
+                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary text-sm font-medium shrink-0">2</div>
                       <div>
                         <p className="font-medium">Content Removal</p>
                         <p className="text-sm text-muted-foreground">If valid, we expeditiously remove or disable access to the infringing content.</p>
@@ -134,10 +134,10 @@ export default function DMCAPage() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="border-border/50">
+                <Card>
                   <CardContent className="pt-6">
                     <div className="flex gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary text-sm font-medium shrink-0">3</div>
+                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary text-sm font-medium shrink-0">3</div>
                       <div>
                         <p className="font-medium">User Notification</p>
                         <p className="text-sm text-muted-foreground">We notify the user who uploaded the content about the takedown and their right to file a counter-notice.</p>
@@ -220,7 +220,7 @@ export default function DMCAPage() {
 
           <section>
             <h2 className="text-xl font-semibold mb-4">10. Contact</h2>
-            <Card className="border-border/50 bg-muted/30">
+            <Card className="bg-muted">
               <CardContent className="pt-6">
                 <div className="space-y-3">
                   <p className="text-sm">
