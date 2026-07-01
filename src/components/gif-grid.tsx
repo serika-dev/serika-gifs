@@ -58,7 +58,7 @@ export function GifGrid({
     try {
       const params = new URLSearchParams({
         page: pageNum.toString(),
-        limit: '50',
+        limit: '60',
       })
 
       if (search) params.set('search', search)

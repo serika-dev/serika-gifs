@@ -67,7 +67,7 @@ export function GifCard({
   return (
     <Link href={`/gif/${gif.slug}`}>
       <Card
-        className="group relative aspect-square overflow-hidden border-border bg-muted cursor-pointer transition-colors duration-150 hover:border-primary/50 p-0 gap-0"
+        className="group relative aspect-square overflow-hidden border-border bg-muted cursor-pointer rounded-xl transition-all duration-200 hover:ring-2 hover:ring-primary/30 hover:border-primary/30 p-0 gap-0 shadow-sm"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onTouchStart={() => setIsHovered(true)}
@@ -138,7 +138,7 @@ function QuickActionButton({
 
 // Skeleton for loading state
 export function GifCardSkeleton() {
-  return <Skeleton className="aspect-square rounded-lg" />
+  return <Skeleton className="aspect-square rounded-xl" />
 }
 
 // Helper to format large numbers
