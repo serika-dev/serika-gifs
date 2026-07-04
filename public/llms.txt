@@ -58,7 +58,10 @@ Every response includes: `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
 Query params:
 - `page` integer, default 1
 - `limit` integer, default 20, max 100
-- `search` string — full-text over title, description, and tags
+- `search` string (alias `q`) — relevance-ranked search over tags, title, and
+  description. Multi-word queries prefer GIFs matching ALL terms (tag matches
+  weighted highest), so `search=kamiina botan` returns GIFs tagged that, not
+  every GIF containing one word. Slugs are matched with spaces/punctuation removed.
 - `tag` string — filter by tag slug (e.g. `reaction`)
 - `userId` string — filter by uploader
 - `sort` one of `trending` (default), `newest`, `popular`, `most-viewed`, `random`
@@ -70,6 +73,8 @@ Response 200:
 ```json
 { "gifs": [Gif, ...], "pagination": { "page": 1, "limit": 20, "total": 150, "totalPages": 8 } }
 ```
+Note: every GIF returned by this endpoint (and GET /gifs/{slug}) counts as a
+view — apps rendering GIFs from the API contribute to view counts.
 
 ### GET /gifs/{slug} — single GIF (auth none)
 Response 200: `{ "gif": Gif }`. 404 if not found.

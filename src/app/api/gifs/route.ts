@@ -37,6 +37,57 @@ function hotnessScore(views: number, favorites: number, createdAt: Date): number
   return quality + freshness
 }
 
+type ScoredGif = {
+  title: string
+  description: string | null
+  views: number
+  _count: { favorites: number }
+  tags: { tag: { name: string } }[]
+}
+
+/**
+ * Relevance score for search. Rewards GIFs that match *all* query terms (via
+ * tags, title, or description), strongly boosts tag matches and exact-phrase
+ * tag/title matches, and penalizes terms that don't appear at all — so a search
+ * like "kamiina botan" surfaces the GIFs actually tagged/titled that, instead of
+ * every high-view GIF that merely contains "botan". Popularity only breaks ties.
+ */
+function searchScore(gif: ScoredGif, terms: string[], phrase: string): number {
+  const title = gif.title.toLowerCase()
+  const desc = (gif.description || '').toLowerCase()
+  const tagNames = gif.tags.map((t) => t.tag.name.toLowerCase())
+  const tagBlob = tagNames.join(' ')
+
+  let score = 0
+  for (const term of terms) {
+    const inTag = tagNames.some((n) => n.includes(term))
+    const inTitle = title.includes(term)
+    const inDesc = desc.includes(term)
+    if (inTag) score += 10
+    if (inTitle) score += 6
+    if (inDesc) score += 2
+    if (!inTag && !inTitle && !inDesc) score -= 5 // missing term hurts
+  }
+
+  // Reward matching every term (AND relevance)
+  const allSomewhere = terms.every(
+    (t) => title.includes(t) || desc.includes(t) || tagNames.some((n) => n.includes(t))
+  )
+  const allInTags = terms.every((t) => tagNames.some((n) => n.includes(t)))
+  if (allSomewhere) score += 15
+  if (allInTags) score += 20
+
+  // Exact / phrase matches
+  if (tagNames.includes(phrase)) score += 40
+  if (title === phrase) score += 30
+  if (tagBlob.includes(phrase)) score += 14
+  if (title.includes(phrase)) score += 12
+
+  // Popularity/recency only nudges ties
+  score += Math.log10(gif.views + gif._count.favorites * 3 + 1)
+  return score
+}
+
 // Handle CORS preflight requests
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -62,7 +113,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100)
-    const search = searchParams.get('search') || ''
+    const search = (searchParams.get('search') || searchParams.get('q') || '').trim()
     const tag = searchParams.get('tag') || ''
     const userId = searchParams.get('userId') || ''
     const source = searchParams.get('source') || ''
@@ -106,22 +157,21 @@ export async function GET(request: NextRequest) {
     }
 
     const isSearching = !!search
-    if (search) {
-      const searchTerms = search.split(/\s+/).filter(Boolean)
-      if (searchTerms.length > 0) {
-        // Use OR for broader matching - any term can match
-        where.OR = searchTerms.flatMap((term) => [
-          { title: { contains: term, mode: 'insensitive' } },
-          { description: { contains: term, mode: 'insensitive' } },
-          {
-            tags: {
-              some: {
-                tag: { name: { contains: term, mode: 'insensitive' } },
-              },
-            },
-          },
-        ])
+    const searchTerms = search ? search.toLowerCase().split(/\s+/).filter(Boolean) : []
+
+    // Match a single term across title, description, tag name, and tag slug
+    // (slug has spaces/punctuation stripped, so "kamiina-botan" also matches).
+    const termMatch = (term: string) => {
+      const slugTerm = term.replace(/[^a-z0-9]/gi, '')
+      const or: any[] = [
+        { title: { contains: term, mode: 'insensitive' } },
+        { description: { contains: term, mode: 'insensitive' } },
+        { tags: { some: { tag: { name: { contains: term, mode: 'insensitive' } } } } },
+      ]
+      if (slugTerm) {
+        or.push({ tags: { some: { tag: { slug: { contains: slugTerm, mode: 'insensitive' } } } } })
       }
+      return { OR: or }
     }
 
     if (tag) {
@@ -163,7 +213,46 @@ export async function GET(request: NextRequest) {
     let gifs
     let total
 
-    if (sort === 'random') {
+    if (isSearching && searchTerms.length > 0) {
+      // Two candidate pools: a STRICT pool that requires every term to match
+      // (this surfaces the truly relevant GIFs even when they have few views),
+      // and a BROAD pool matching any term (typo/partial tolerance). Both are
+      // merged and re-ranked by relevance so page 1 is the best matches.
+      const POOL_SIZE = 500
+      const strictWhere = { ...where, AND: searchTerms.map(termMatch) }
+      const broadWhere = { ...where, OR: searchTerms.flatMap((t) => termMatch(t).OR) }
+
+      const [strictPool, broadPool, count] = await Promise.all([
+        prisma.gif.findMany({
+          where: strictWhere,
+          include: GIF_LIST_INCLUDE,
+          orderBy: [{ views: 'desc' }, { createdAt: 'desc' }],
+          take: POOL_SIZE,
+        }),
+        prisma.gif.findMany({
+          where: broadWhere,
+          include: GIF_LIST_INCLUDE,
+          orderBy: [{ views: 'desc' }, { createdAt: 'desc' }],
+          take: POOL_SIZE,
+        }),
+        prisma.gif.count({ where: broadWhere }),
+      ])
+
+      const byId = new Map<string, typeof broadPool[number]>()
+      for (const g of strictPool) byId.set(g.id, g)
+      for (const g of broadPool) byId.set(g.id, g)
+
+      const phrase = search.toLowerCase()
+      const ranked = Array.from(byId.values()).sort((a, b) => {
+        const d = searchScore(b, searchTerms, phrase) - searchScore(a, searchTerms, phrase)
+        if (d !== 0) return d
+        if (a.views !== b.views) return b.views - a.views
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
+
+      total = count
+      gifs = ranked.slice(skip, skip + limit)
+    } else if (sort === 'random') {
       total = await prisma.gif.count({ where })
       const randomSkip = Math.floor(Math.random() * Math.max(0, total - limit))
 
@@ -253,33 +342,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // When searching, re-rank results by relevance (title match > tag match > views)
-    if (isSearching && gifs.length > 1) {
-      const searchLower = search.toLowerCase()
-      const searchTerms = searchLower.split(/\s+/).filter(Boolean)
-      gifs = [...gifs].sort((a: typeof gifs[number], b: typeof gifs[number]) => {
-        const aTitle = a.title.toLowerCase()
-        const bTitle = b.title.toLowerCase()
-        // Exact title match ranks highest
-        const aExact = aTitle === searchLower
-        const bExact = bTitle === searchLower
-        if (aExact !== bExact) return aExact ? -1 : 1
-        // Title starts with search query
-        const aStarts = aTitle.startsWith(searchLower)
-        const bStarts = bTitle.startsWith(searchLower)
-        if (aStarts !== bStarts) return aStarts ? -1 : 1
-        // Title contains search query
-        const aContains = aTitle.includes(searchLower)
-        const bContains = bTitle.includes(searchLower)
-        if (aContains !== bContains) return aContains ? -1 : 1
-        // Count how many search terms match the title
-        const aTitleMatches = searchTerms.filter((t) => aTitle.includes(t)).length
-        const bTitleMatches = searchTerms.filter((t) => bTitle.includes(t)).length
-        if (aTitleMatches !== bTitleMatches) return bTitleMatches - aTitleMatches
-        // Fallback: views desc, then recency
-        if (a.views !== b.views) return b.views - a.views
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      })
+    // Count a view for every GIF the API hands back (list, search, and app
+    // usage all count), matching single-GIF view behaviour. Fire the increment
+    // and reflect it in the returned counts.
+    let viewed = false
+    if (gifs.length > 0) {
+      try {
+        await prisma.gif.updateMany({
+          where: { id: { in: gifs.map((g: typeof gifs[number]) => g.id) } },
+          data: { views: { increment: 1 } },
+        })
+        viewed = true
+      } catch (e) {
+        console.error('Error incrementing views:', e)
+      }
     }
 
     const formattedGifs = gifs.map((gif: typeof gifs[number]) => ({
@@ -296,7 +372,7 @@ export async function GET(request: NextRequest) {
       duration: gif.duration,
       source: gif.source,
       isNsfw: gif.isNsfw,
-      views: gif.views,
+      views: viewed ? gif.views + 1 : gif.views,
       favorites: gif._count.favorites,
       tags: gif.tags.map((t: { tag: { name: string } }) => t.tag.name),
       user: gif.user,

@@ -10,13 +10,19 @@ interface SearchPageProps {
 
 async function getMatchingTags(query: string) {
   if (!query) return []
-  
+
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const slugQuery = query.toLowerCase().replace(/[^a-z0-9]/g, '')
+
   const tags = await prisma.tag.findMany({
     where: {
-      name: {
-        contains: query,
-        mode: 'insensitive',
-      },
+      slug: { not: 'import' },
+      OR: [
+        // Tags whose name contains every term (any order)
+        { AND: terms.map((t) => ({ name: { contains: t, mode: 'insensitive' as const } })) },
+        // Or whose (de-spaced) slug contains the de-spaced query
+        ...(slugQuery ? [{ slug: { contains: slugQuery, mode: 'insensitive' as const } }] : []),
+      ],
     },
     include: {
       _count: {
