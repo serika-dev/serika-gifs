@@ -327,10 +327,20 @@ export default function SettingsPage() {
           <TabsContent value="api">
             <Card>
               <CardHeader>
-                <CardTitle>API Keys</CardTitle>
-                <CardDescription>
-                  Generate API keys to access SerikaGifs programmatically
-                </CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>API Keys</CardTitle>
+                    <CardDescription>
+                      Generate API keys to access SerikaGifs programmatically
+                    </CardDescription>
+                  </div>
+                  <Link
+                    href="/developer/docs/getting-started"
+                    className="text-sm text-primary hover:underline whitespace-nowrap shrink-0"
+                  >
+                    API docs →
+                  </Link>
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex gap-2">
@@ -379,8 +389,14 @@ export default function SettingsPage() {
                                 <span className="text-xs text-muted-foreground">(Admin)</span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <code className="text-xs bg-background px-2 py-1 rounded truncate max-w-[200px]">
+                            <div className="flex items-start gap-2">
+                              <code
+                                className={`text-xs bg-background px-2 py-1 rounded font-mono ${
+                                  showKey === key.id
+                                    ? 'break-all whitespace-pre-wrap flex-1 min-w-0 select-all'
+                                    : 'truncate max-w-[200px]'
+                                }`}
+                              >
                                 {showKey === key.id ? key.key : '••••••••••••••••••••••••'}
                               </code>
                               <Button

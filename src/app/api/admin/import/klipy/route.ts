@@ -7,26 +7,51 @@ import {
   checkExistingBySourceId,
 } from '@/lib/import-utils'
 
-interface KlipySearchResult {
-  results: KlipyGif[]
-  nextPage?: string
-}
-
-interface KlipyGif {
+interface NormalizedKlipyGif {
   id: string
   title?: string
-  description?: string
-  url?: string
-  gif_url?: string
-  preview?: string
-  thumbnail?: string
-  source_url?: string
+  gifUrl?: string
+  mp4Url?: string
+  previewUrl?: string
+  sourceUrl?: string
   width?: number
   height?: number
   tags?: string[]
-  media?: {
-    gif?: string
-    thumbnail?: string
+}
+
+interface KlipySearchResult {
+  results: NormalizedKlipyGif[]
+  nextPage?: string
+}
+
+/**
+ * Klipy's real API places the API key in the URL path (NOT a header/query param):
+ *   https://api.klipy.com/api/v1/{API_KEY}/gifs/{search|trending}?q=...&per_page=...&page=...
+ * Response shape:
+ *   { result: true, data: { data: [{ id, slug, title, file: { hd: { gif: {url,width,height}, mp4 }, sm, xs } }], current_page, per_page } }
+ */
+function normalizeKlipyItem(gif: any): NormalizedKlipyGif {
+  const file = gif.file || {}
+  const hd = file.hd || {}
+  const md = file.md || {}
+  const sm = file.sm || {}
+  const xs = file.xs || {}
+
+  const hdGif = hd.gif || md.gif || sm.gif || {}
+  const previewGif = sm.gif || xs.gif || hdGif
+
+  return {
+    id: (gif.id ?? gif.slug ?? '').toString(),
+    title: gif.title || gif.slug || undefined,
+    gifUrl: hdGif.url || '',
+    mp4Url: hd.mp4?.url || md.mp4?.url || sm.mp4?.url || undefined,
+    previewUrl: previewGif.url || undefined,
+    sourceUrl: gif.url || gif.source || undefined,
+    width: hdGif.width || 0,
+    height: hdGif.height || 0,
+    tags: Array.isArray(gif.tags)
+      ? gif.tags.map((t: any) => (typeof t === 'string' ? t : t?.name)).filter(Boolean)
+      : [],
   }
 }
 
@@ -35,20 +60,17 @@ async function searchKlipy(query: string, limit: number = 20, page?: string): Pr
   const apiKey = process.env.KLIPY_API_KEY
   if (!apiKey) throw new Error('KLIPY_API_KEY not configured')
 
+  const pageNum = page ? parseInt(page, 10) || 1 : 1
   const params = new URLSearchParams({
     q: query,
-    limit: limit.toString(),
+    per_page: limit.toString(),
+    page: pageNum.toString(),
   })
-  
-  if (page) {
-    params.set('page', page)
-  }
 
   const response = await fetch(
-    `https://api.klipy.co/v1/search?${params}`,
+    `https://api.klipy.com/api/v1/${apiKey}/gifs/search?${params}`,
     {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
         'Accept': 'application/json',
       },
     }
@@ -64,14 +86,21 @@ async function searchKlipy(query: string, limit: number = 20, page?: string): Pr
   let data
   try {
     data = JSON.parse(text)
-  } catch (e) {
+  } catch {
     console.error('Klipy JSON parse error:', text.substring(0, 500))
     throw new Error('Invalid JSON response from Klipy API')
   }
-  
+
+  const items: any[] = data?.data?.data || data?.data || data?.results || []
+  const results = (Array.isArray(items) ? items : [])
+    .map(normalizeKlipyItem)
+    .filter((g) => g.gifUrl)
+
+  // Klipy paginates by page number; assume more pages exist while it returns a full page.
+  const hasMore = results.length >= limit
   return {
-    results: data.results || data.data || data.gifs || [],
-    nextPage: data.next_page || data.nextPage || data.pagination?.next,
+    results,
+    nextPage: hasMore ? (pageNum + 1).toString() : undefined,
   }
 }
 
@@ -112,16 +141,14 @@ export async function POST(request: NextRequest) {
 
       // Transform to common format
       const gifsToImport: GifToImport[] = results
-        .filter(result => {
-          const gifUrl = result.url || result.gif_url || result.media?.gif
-          return gifUrl && !existingMap.has(result.id)
-        })
+        .filter(result => result.gifUrl && !existingMap.has(result.id))
         .map(result => ({
           sourceId: result.id,
-          title: result.title || result.description || query,
-          gifUrl: result.url || result.gif_url || result.media?.gif || '',
-          previewUrl: result.preview || result.thumbnail || result.media?.thumbnail,
-          sourceUrl: result.source_url || result.url,
+          title: result.title || query,
+          gifUrl: result.gifUrl || '',
+          mp4Url: result.mp4Url,
+          previewUrl: result.previewUrl,
+          sourceUrl: result.sourceUrl,
           width: result.width || 0,
           height: result.height || 0,
           source: 'KLIPY' as const,
@@ -217,10 +244,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       results: results.map((r) => ({
         id: r.id,
-        title: r.title || r.description,
-        url: r.url || r.gif_url || r.media?.gif,
-        preview: r.preview || r.thumbnail || r.media?.thumbnail,
-        sourceUrl: r.source_url,
+        title: r.title,
+        url: r.gifUrl,
+        preview: r.previewUrl || r.gifUrl,
+        sourceUrl: r.sourceUrl,
         alreadyImported: existingMap.has(r.id),
       })),
       totalCount: results.length,

@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Upload, X, Loader2, Image as ImageIcon, ShieldAlert, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function UploadPage() {
@@ -22,6 +23,8 @@ export default function UploadPage() {
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
+  const [isNsfw, setIsNsfw] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
 
   const addTag = useCallback((tag: string) => {
     const normalizedTag = tag.trim().toLowerCase()
@@ -48,8 +51,7 @@ export default function UploadPage() {
     }
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
+  const acceptFile = useCallback((selectedFile: File | undefined | null) => {
     if (!selectedFile) return
 
     const allowedTypes = ['image/gif', 'image/webp', 'video/mp4', 'video/webm']
@@ -66,12 +68,21 @@ export default function UploadPage() {
 
     setFile(selectedFile)
     setPreview(URL.createObjectURL(selectedFile))
-    
+
     // Auto-fill title from filename
-    if (!title) {
-      const name = selectedFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
-      setTitle(name)
-    }
+    setTitle((prev) =>
+      prev ? prev : selectedFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
+    )
+  }, [])
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    acceptFile(e.target.files?.[0])
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    acceptFile(e.dataTransfer.files?.[0])
   }
 
   const clearFile = () => {
@@ -103,6 +114,7 @@ export default function UploadPage() {
       formData.append('title', title)
       formData.append('description', description)
       formData.append('tags', tags.join(','))
+      formData.append('isNsfw', String(isNsfw))
 
       const response = await fetch('/api/gifs', {
         method: 'POST',
@@ -130,6 +142,16 @@ export default function UploadPage() {
       <Header />
 
       <main className="container mx-auto px-4 py-8 max-w-3xl">
+        <div className="mb-6 rounded-xl border border-border bg-gradient-to-br from-primary/10 via-background to-background p-6">
+          <div className="flex items-center gap-2 text-primary mb-1">
+            <Sparkles className="h-4 w-4" />
+            <span className="text-xs font-medium uppercase tracking-wide">Share a GIF</span>
+          </div>
+          <h1 className="text-2xl font-bold">Upload to Serika GIFs</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Drop a file, add a few tags, and share it with the community. GIF, WebP, MP4 and WebM are supported.
+          </p>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -189,11 +211,18 @@ export default function UploadPage() {
                 ) : (
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="mt-2 border-2 border-dashed border-border rounded-md p-12 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                    onDragLeave={(e) => { e.preventDefault(); setIsDragging(false) }}
+                    onDrop={handleDrop}
+                    className={`mt-2 border-2 border-dashed rounded-md p-12 text-center cursor-pointer transition-colors ${
+                      isDragging
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50'
+                    }`}
                   >
-                    <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <ImageIcon className={`h-12 w-12 mx-auto mb-4 transition-colors ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
                     <p className="text-muted-foreground mb-2">
-                      Click to select a file or drag and drop
+                      {isDragging ? 'Drop your file to upload' : 'Click to select a file or drag and drop'}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       GIF, WebP, MP4, WebM up to 50MB
@@ -261,6 +290,25 @@ export default function UploadPage() {
                 <p className="text-xs text-muted-foreground">
                   Press Enter or comma to add tags (max 10)
                 </p>
+              </div>
+
+              {/* NSFW toggle */}
+              <div
+                className={`flex items-start justify-between gap-4 rounded-md border p-4 transition-colors ${
+                  isNsfw ? 'border-destructive/50 bg-destructive/5' : 'border-border'
+                }`}
+              >
+                <div className="space-y-1">
+                  <Label htmlFor="nsfw" className="flex items-center gap-2 cursor-pointer">
+                    <ShieldAlert className={`h-4 w-4 ${isNsfw ? 'text-destructive' : 'text-muted-foreground'}`} />
+                    Mark as NSFW
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Enable for adult or not-safe-for-work content. NSFW GIFs are hidden from
+                    default browsing and search.
+                  </p>
+                </div>
+                <Switch id="nsfw" checked={isNsfw} onCheckedChange={setIsNsfw} />
               </div>
 
               <Button

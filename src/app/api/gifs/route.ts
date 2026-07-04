@@ -8,6 +8,35 @@ import { nanoid } from 'nanoid'
 import imageSize from 'image-size'
 import { checkRateLimit, rateLimitResponse, addRateLimitHeaders } from '@/lib/rate-limit'
 
+// Shared include shape for GIF list queries
+const GIF_LIST_INCLUDE = {
+  user: {
+    select: { id: true, username: true, avatar: true },
+  },
+  tags: {
+    include: { tag: true },
+  },
+  _count: {
+    select: { favorites: true },
+  },
+} as const
+
+/**
+ * Time-decayed "hotness" score for trending.
+ *
+ * Blends engagement quality (views + weighted favorites, log-scaled so a few
+ * viral GIFs don't permanently dominate) with a freshness term that decays over
+ * days. New uploads surface immediately, then fall off unless they earn views;
+ * consistently popular GIFs keep a baseline. Higher is hotter.
+ */
+function hotnessScore(views: number, favorites: number, createdAt: Date): number {
+  const engagement = views + favorites * 4 + 1
+  const quality = Math.log10(engagement)
+  const ageHours = Math.max(0, Date.now() - new Date(createdAt).getTime()) / 3_600_000
+  const freshness = 6 / Math.pow(ageHours + 2, 0.8)
+  return quality + freshness
+}
+
 // Handle CORS preflight requests
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -39,11 +68,19 @@ export async function GET(request: NextRequest) {
     const source = searchParams.get('source') || ''
     const sort = searchParams.get('sort') || 'trending'
     const timeRange = searchParams.get('timeRange') || 'all'
+    // NSFW handling: 'exclude' (default, SFW only), 'include' (SFW + NSFW), 'only' (NSFW only)
+    const nsfw = (searchParams.get('nsfw') || 'exclude').toLowerCase()
 
     const skip = (page - 1) * limit
 
     const where: any = {
       isPublic: true,
+    }
+
+    if (nsfw === 'only') {
+      where.isNsfw = true
+    } else if (nsfw !== 'include') {
+      where.isNsfw = false
     }
 
     // Time range filter
@@ -101,17 +138,14 @@ export async function GET(request: NextRequest) {
       where.userId = userId
     }
 
-    // Determine sort order
+    // Determine sort order (trending is handled separately below via scoring)
     let orderBy: any
     switch (sort) {
-      case 'trending':
-        orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
-        break
       case 'popular':
         orderBy = { favorites: { _count: 'desc' } }
         break
       case 'most-viewed':
-        orderBy = { views: 'desc' }
+        orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
         break
       case 'random':
         orderBy = undefined
@@ -119,6 +153,7 @@ export async function GET(request: NextRequest) {
       case 'newest':
         orderBy = { createdAt: 'desc' }
         break
+      case 'trending':
       default:
         orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
     }
@@ -134,51 +169,59 @@ export async function GET(request: NextRequest) {
 
       gifs = await prisma.gif.findMany({
         where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              avatar: true,
-            },
-          },
-          tags: {
-            include: {
-              tag: true,
-            },
-          },
-          _count: {
-            select: {
-              favorites: true,
-            },
-          },
-        },
+        include: GIF_LIST_INCLUDE,
         skip: randomSkip,
         take: limit,
       })
+    } else if (!isSearching && sort === 'trending') {
+      // Trending: build a candidate pool (freshest + most-viewed), score each
+      // with a time-decayed hotness function, then rank. This avoids the old
+      // behaviour where a handful of high-view GIFs dominated forever.
+      const POOL_SIZE = 600
+      const [recentPool, viewedPool, count] = await Promise.all([
+        prisma.gif.findMany({
+          where,
+          include: GIF_LIST_INCLUDE,
+          orderBy: { createdAt: 'desc' },
+          take: POOL_SIZE,
+        }),
+        prisma.gif.findMany({
+          where,
+          include: GIF_LIST_INCLUDE,
+          orderBy: [{ views: 'desc' }, { createdAt: 'desc' }],
+          take: POOL_SIZE,
+        }),
+        prisma.gif.count({ where }),
+      ])
+
+      const byId = new Map<string, typeof recentPool[number]>()
+      for (const g of recentPool) byId.set(g.id, g)
+      for (const g of viewedPool) byId.set(g.id, g)
+
+      const ranked = Array.from(byId.values()).sort(
+        (a, b) =>
+          hotnessScore(b.views, b._count.favorites, b.createdAt) -
+          hotnessScore(a.views, a._count.favorites, a.createdAt)
+      )
+
+      total = count
+      gifs = ranked.slice(skip, skip + limit)
+
+      // Deep pages fall outside the scored pool; fall back to a DB query.
+      if (gifs.length === 0 && skip > 0) {
+        gifs = await prisma.gif.findMany({
+          where,
+          include: GIF_LIST_INCLUDE,
+          orderBy: [{ views: 'desc' }, { createdAt: 'desc' }],
+          skip,
+          take: limit,
+        })
+      }
     } else {
       const result = await Promise.all([
         prisma.gif.findMany({
           where,
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                avatar: true,
-              },
-            },
-            tags: {
-              include: {
-                tag: true,
-              },
-            },
-            _count: {
-              select: {
-                favorites: true,
-              },
-            },
-          },
+          include: GIF_LIST_INCLUDE,
           orderBy,
           skip,
           take: limit,
@@ -197,17 +240,7 @@ export async function GET(request: NextRequest) {
         const fallbackResult = await Promise.all([
           prisma.gif.findMany({
             where: fallbackWhere,
-            include: {
-              user: {
-                select: { id: true, username: true, avatar: true },
-              },
-              tags: {
-                include: { tag: true },
-              },
-              _count: {
-                select: { favorites: true },
-              },
-            },
+            include: GIF_LIST_INCLUDE,
             orderBy,
             skip,
             take: limit,
@@ -262,6 +295,7 @@ export async function GET(request: NextRequest) {
       fileSize: gif.fileSize,
       duration: gif.duration,
       source: gif.source,
+      isNsfw: gif.isNsfw,
       views: gif.views,
       favorites: gif._count.favorites,
       tags: gif.tags.map((t: { tag: { name: string } }) => t.tag.name),
@@ -308,6 +342,7 @@ export async function POST(request: NextRequest) {
     const description = formData.get('description') as string
     const tags = formData.get('tags') as string
     const isPublic = formData.get('isPublic') !== 'false'
+    const isNsfw = formData.get('isNsfw') === 'true'
 
     if (!file) {
       return NextResponse.json(
@@ -504,6 +539,7 @@ export async function POST(request: NextRequest) {
         height,
         fileSize: file.size,
         isPublic,
+        isNsfw,
         userId: session.id,
       },
     })

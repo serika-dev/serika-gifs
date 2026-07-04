@@ -1,0 +1,134 @@
+# Serika GIFs API
+
+> Serika GIFs is a public GIF hosting and search platform. This document is a
+> compact, complete reference written for LLMs and automated agents. Every
+> endpoint, parameter, auth rule, and response shape needed to integrate is here.
+
+Base URL: https://gifs.serika.dev/api
+All responses are JSON. All timestamps are ISO 8601 UTC strings.
+
+## Authentication
+
+- Header (recommended): `X-API-Key: sgif_...`
+- Header (alternative): `Authorization: Bearer sgif_...`
+- Query param (discouraged): `?api_key=sgif_...`
+- Public endpoints work without a key but share a low anonymous rate limit.
+- Create keys at https://gifs.serika.dev/settings. Keys look like `sgif_<32 chars>`.
+
+## Rate limits (requests per hour)
+
+- Anonymous: 30
+- Tier 1 (default for new keys): 1,000
+- Tier 2: 10,000  (request upgrade)
+- Tier 3: 100,000 (request upgrade)
+- Tier 4: 1,000,000 (request upgrade)
+- Tier 5: unlimited (strict guidelines apply)
+
+Every response includes: `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
+`X-RateLimit-Reset` (unix seconds). On HTTP 429, honor `Retry-After` (seconds).
+
+## Core object: Gif
+
+```json
+{
+  "id": "clx123",
+  "slug": "funny-cat",
+  "title": "Funny Cat",
+  "description": "optional",
+  "url": "https://cdn.serika.dev/gifs/.../funny-cat.gif",
+  "webmUrl": "https://.../funny-cat.webm",
+  "thumbnailUrl": "https://.../funny-cat.webp",
+  "width": 480,
+  "height": 270,
+  "fileSize": 1048576,
+  "duration": 2.4,
+  "source": "UPLOAD",         // UPLOAD | TENOR | GIPHY | KLIPY
+  "isNsfw": false,
+  "views": 1234,
+  "favorites": 42,
+  "tags": ["cat", "funny"],
+  "user": { "id": "usr123", "username": "john", "avatar": null },
+  "createdAt": "2026-01-01T00:00:00.000Z"
+}
+```
+
+## Endpoints
+
+### GET /gifs — list & search GIFs (auth optional)
+Query params:
+- `page` integer, default 1
+- `limit` integer, default 20, max 100
+- `search` string — full-text over title, description, and tags
+- `tag` string — filter by tag slug (e.g. `reaction`)
+- `userId` string — filter by uploader
+- `sort` one of `trending` (default), `newest`, `popular`, `most-viewed`, `random`
+  - `trending` ranks by a time-decayed hotness score = log10(views + 4·favorites + 1) + freshness decay, so new and consistently-popular GIFs both surface.
+- `timeRange` one of `all` (default), `day`, `week`, `month`
+- `nsfw` one of `exclude` (default, SFW only), `include` (SFW + NSFW), `only` (NSFW only)
+
+Response 200:
+```json
+{ "gifs": [Gif, ...], "pagination": { "page": 1, "limit": 20, "total": 150, "totalPages": 8 } }
+```
+
+### GET /gifs/{slug} — single GIF (auth none)
+Response 200: `{ "gif": Gif }`. 404 if not found.
+
+### POST /gifs — upload a GIF (auth required)
+Content-Type: `multipart/form-data`. Fields:
+- `file` (required) — image/gif, image/webp, video/mp4, or video/webm; max 50MB
+- `title` (required) string
+- `description` (optional) string
+- `tags` (optional) comma-separated, max 10, e.g. `cat,funny`
+- `isPublic` (optional) boolean, default true
+- `isNsfw` (optional) boolean, default false — marks adult content; hidden from default listings
+Response 200: `{ "success": true, "gif": { "id", "slug", "title", "url" } }`
+
+### DELETE /gifs/{slug} — delete a GIF (auth required; owner or admin)
+Response 200: `{ "success": true }`. 403 if not permitted.
+
+### GET /collections — list collections (auth optional)
+Query: `page`, `limit`, `userId`, `sort` (`popular` default, `newest`, `alphabetical`).
+Response: `{ "collections": [{ "id", "name", "slug", "gifCount", "previewGifs": [...] }], "pagination": {...} }`
+
+### POST /collections — create collection (auth required)
+JSON body: `{ "name": "My Reactions", "description"?: string, "isPublic"?: true }`
+
+### GET /collections/{id} — collection with its GIFs (auth optional)
+
+### GET /favorites — list current user's favorites (auth required)
+### POST /favorites — add favorite (auth required). JSON body: `{ "gifId": "clx123" }`
+### DELETE /favorites?gifId=clx123 — remove favorite (auth required)
+
+### GET /tags — list/search tags (auth none)
+Query: `search` string, `limit` integer (default 50, max 100).
+Response: `{ "tags": [{ "name", "slug", "count" }] }`
+
+### GET /keys — list your API keys (auth required)
+### POST /keys — create API key (auth required). JSON body: `{ "name": "My App" }` → starts at Tier 1.
+
+### GET /auth/session — current session (auth optional) → `{ "user": {...} | null }`
+### POST /auth/login — JSON `{ "email", "password" }`
+
+### GET /stats/trending — site-wide trending stats (auth none)
+Response: `{ "trendingToday", "totalViews", "favoritesToday", "growth": "+12%" }`
+
+## Common errors
+- 400 invalid input, 401 unauthenticated, 403 forbidden, 404 not found,
+  429 rate limited (retry after `Retry-After` seconds), 500 server error.
+Error body shape: `{ "error": "message" }`.
+
+## Minimal examples
+
+Search trending funny GIFs:
+```bash
+curl "https://gifs.serika.dev/api/gifs?search=funny&sort=trending&limit=10" \
+  -H "X-API-Key: sgif_YOUR_KEY"
+```
+
+Upload:
+```bash
+curl -X POST "https://gifs.serika.dev/api/gifs" \
+  -H "X-API-Key: sgif_YOUR_KEY" \
+  -F "file=@cat.gif" -F "title=Funny Cat" -F "tags=cat,funny" -F "isNsfw=false"
+```

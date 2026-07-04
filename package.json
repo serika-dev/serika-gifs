@@ -13,7 +13,8 @@
     "db:sync:force": "bun run scripts/media-sync.ts --force",
     "db:deduplicate": "bun run scripts/deduplicate-gifs.ts",
     "db:retag": "bun run scripts/retag-imports.ts",
-    "db:fix-dimensions": "bun run scripts/fix-dimensions.ts"
+    "db:fix-dimensions": "bun run scripts/fix-dimensions.ts",
+    "db:reverse-tag": "bun run scripts/reverse-tag-order.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.975.0",

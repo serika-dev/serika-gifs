@@ -116,9 +116,12 @@ const API_SECTIONS: ApiSection[] = [
         queryParams: [
           { name: 'page', type: 'integer', required: false, description: 'Page number', default: '1', example: '1' },
           { name: 'limit', type: 'integer', required: false, description: 'Results per page (max 100)', default: '20', example: '10' },
-          { name: 'q', type: 'string', required: false, description: 'Search query', example: 'funny cat' },
+          { name: 'search', type: 'string', required: false, description: 'Full-text search over title, description and tags', example: 'funny cat' },
           { name: 'tag', type: 'string', required: false, description: 'Filter by tag slug', example: 'reaction' },
-          { name: 'sort', type: 'string', required: false, description: 'Sort order', default: 'newest', enum: ['newest', 'trending', 'popular', 'most-viewed'] },
+          { name: 'userId', type: 'string', required: false, description: 'Filter by uploader user ID' },
+          { name: 'sort', type: 'string', required: false, description: 'Sort order. "trending" uses a time-decayed hotness score (views + favorites + recency).', default: 'trending', enum: ['trending', 'newest', 'popular', 'most-viewed', 'random'] },
+          { name: 'timeRange', type: 'string', required: false, description: 'Restrict to GIFs created within a window', default: 'all', enum: ['all', 'day', 'week', 'month'] },
+          { name: 'nsfw', type: 'string', required: false, description: 'NSFW visibility: exclude (SFW only, default), include (SFW + NSFW), only (NSFW only)', default: 'exclude', enum: ['exclude', 'include', 'only'] },
         ],
         responses: [
           {
@@ -155,9 +158,12 @@ const API_SECTIONS: ApiSection[] = [
         requestBody: {
           contentType: 'multipart/form-data',
           fields: [
-            { name: 'file', type: 'file', required: true, description: 'GIF or video file (max 50MB)' },
+            { name: 'file', type: 'file', required: true, description: 'GIF or video file (max 50MB). Allowed: image/gif, image/webp, video/mp4, video/webm' },
             { name: 'title', type: 'string', required: true, description: 'Title', example: 'Funny Cat' },
-            { name: 'tags', type: 'string', required: false, description: 'Comma-separated tags', example: 'cat,funny' },
+            { name: 'description', type: 'string', required: false, description: 'Optional description' },
+            { name: 'tags', type: 'string', required: false, description: 'Comma-separated tags (max 10)', example: 'cat,funny' },
+            { name: 'isPublic', type: 'boolean', required: false, description: 'Publicly listed (default true)', default: 'true' },
+            { name: 'isNsfw', type: 'boolean', required: false, description: 'Mark as NSFW/adult content (default false). NSFW GIFs are hidden from default listings.', default: 'false' },
           ],
         },
         responses: [
@@ -254,6 +260,36 @@ const API_SECTIONS: ApiSection[] = [
           { status: 200, description: 'Success', example: { favorites: [{ id: 'gif123', slug: 'funny-cat', title: 'Funny Cat' }] } },
         ],
       },
+      {
+        method: 'POST',
+        path: '/favorites',
+        summary: 'Add Favorite',
+        description: 'Add a GIF to the current user\'s favorites.',
+        tags: ['Favorites', 'Protected'],
+        auth: 'required',
+        requestBody: {
+          contentType: 'application/json',
+          fields: [{ name: 'gifId', type: 'string', required: true, description: 'GIF ID to favorite', example: 'clx123' }],
+        },
+        responses: [
+          { status: 200, description: 'Success', example: { success: true } },
+          { status: 400, description: 'Already favorited' },
+          { status: 401, description: 'Unauthorized' },
+        ],
+      },
+      {
+        method: 'DELETE',
+        path: '/favorites',
+        summary: 'Remove Favorite',
+        description: 'Remove a GIF from the current user\'s favorites.',
+        tags: ['Favorites', 'Protected'],
+        auth: 'required',
+        queryParams: [{ name: 'gifId', type: 'string', required: true, description: 'GIF ID to remove', example: 'clx123' }],
+        responses: [
+          { status: 200, description: 'Success', example: { success: true } },
+          { status: 401, description: 'Unauthorized' },
+        ],
+      },
     ],
   },
   {
@@ -271,7 +307,7 @@ const API_SECTIONS: ApiSection[] = [
         auth: 'none',
         testable: true,
         queryParams: [
-          { name: 'q', type: 'string', required: false, description: 'Search query', example: 'fun' },
+          { name: 'search', type: 'string', required: false, description: 'Search query', example: 'fun' },
           { name: 'limit', type: 'integer', required: false, description: 'Results (max 100)', default: '50', example: '20' },
         ],
         responses: [
@@ -682,6 +718,18 @@ function GettingStartedPage({ baseUrl, apiKey }: { baseUrl: string; apiKey: stri
         <h1 className="text-2xl font-bold mb-2">Getting Started</h1>
         <p className="text-zinc-400">Get started with the SerikaGifs API in minutes.</p>
       </div>
+
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="py-4 flex items-start gap-3">
+          <Terminal className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+          <div className="text-sm text-zinc-300">
+            <span className="font-medium">Building with an LLM or agent?</span> A compact,
+            machine-readable reference of the entire API lives at{' '}
+            <a href="/llms.txt" className="text-primary hover:underline font-mono">/llms.txt</a>.
+            Paste it into your model&apos;s context for accurate, up-to-date endpoint definitions.
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-zinc-800 bg-zinc-900/30">
         <CardHeader className="pb-2">
