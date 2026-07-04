@@ -23,6 +23,7 @@ export const NAV_LINKS = [
   { href: '/trending', label: 'Trending' },
   { href: '/tags', label: 'Tags' },
   { href: '/collections', label: 'Collections' },
+  { href: '/docs', label: 'Docs' },
 ] as const
 
 // User dropdown menu items (for logged in users)
