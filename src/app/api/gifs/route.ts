@@ -37,6 +37,14 @@ function hotnessScore(views: number, favorites: number, createdAt: Date): number
   return quality + freshness
 }
 
+/**
+ * All-time "top" score: pure engagement (views + weighted favorites), no
+ * freshness decay, so the best GIFs ever surface regardless of upload date.
+ */
+function topScore(views: number, favorites: number): number {
+  return views + favorites * 4
+}
+
 type ScoredGif = {
   title: string
   description: string | null
@@ -117,7 +125,9 @@ export async function GET(request: NextRequest) {
     const tag = searchParams.get('tag') || ''
     const userId = searchParams.get('userId') || ''
     const source = searchParams.get('source') || ''
-    const sort = searchParams.get('sort') || 'trending'
+    // Default to all-time TOP so apps that don't pass a sort get the best GIFs
+    // ever, not a recency-biased "trending today/this week" feed.
+    const sort = searchParams.get('sort') || 'top'
     const timeRange = searchParams.get('timeRange') || 'all'
     // NSFW handling: 'exclude' (default, SFW only), 'include' (SFW + NSFW), 'only' (NSFW only)
     const nsfw = (searchParams.get('nsfw') || 'exclude').toLowerCase()
@@ -204,7 +214,9 @@ export async function GET(request: NextRequest) {
         orderBy = { createdAt: 'desc' }
         break
       case 'trending':
+      case 'top':
       default:
+        // Both use a scored pool below; this is only the deep-page fallback.
         orderBy = [{ views: 'desc' }, { createdAt: 'desc' }]
     }
 
@@ -262,10 +274,9 @@ export async function GET(request: NextRequest) {
         skip: randomSkip,
         take: limit,
       })
-    } else if (!isSearching && sort === 'trending') {
-      // Trending: build a candidate pool (freshest + most-viewed), score each
-      // with a time-decayed hotness function, then rank. This avoids the old
-      // behaviour where a handful of high-view GIFs dominated forever.
+    } else if (!isSearching && (sort === 'trending' || sort === 'top')) {
+      // Build a candidate pool (freshest + most-viewed) and score each. 'top'
+      // ranks by pure all-time engagement; 'trending' adds a freshness term.
       const POOL_SIZE = 600
       const [recentPool, viewedPool, count] = await Promise.all([
         prisma.gif.findMany({
@@ -287,11 +298,13 @@ export async function GET(request: NextRequest) {
       for (const g of recentPool) byId.set(g.id, g)
       for (const g of viewedPool) byId.set(g.id, g)
 
-      const ranked = Array.from(byId.values()).sort(
-        (a, b) =>
-          hotnessScore(b.views, b._count.favorites, b.createdAt) -
-          hotnessScore(a.views, a._count.favorites, a.createdAt)
-      )
+      const score =
+        sort === 'top'
+          ? (g: typeof recentPool[number]) => topScore(g.views, g._count.favorites)
+          : (g: typeof recentPool[number]) =>
+              hotnessScore(g.views, g._count.favorites, g.createdAt)
+
+      const ranked = Array.from(byId.values()).sort((a, b) => score(b) - score(a))
 
       total = count
       gifs = ranked.slice(skip, skip + limit)
