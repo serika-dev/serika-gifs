@@ -32,6 +32,7 @@
  */
 
 import { PrismaClient, GifSource } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 import { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3'
 import { spawn } from 'child_process'
 import { writeFile, unlink, mkdir } from 'fs/promises'
@@ -39,7 +40,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import sharp from 'sharp'
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) })
 
 const s3Client = new S3Client({
   region: 'eu-central-003',

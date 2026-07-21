@@ -1,4 +1,3 @@
-import Image from 'next/image'
 import Link from 'next/link'
 
 interface LogoProps {
@@ -16,15 +15,31 @@ export function Logo({
   linkTo = '/',
   showLink = true,
 }: LogoProps) {
+  // Inline SVG so the wordmark uses `currentColor` for "Serika" — this makes it
+  // legible in both light and dark themes (the old /logo.svg was hardcoded white
+  // and disappeared on the light background).
   const logoImage = (
-    <Image
-      src="/logo.svg"
-      alt="SerikaGifs"
+    <svg
       width={width}
       height={height}
-      className={className}
-      priority
-    />
+      viewBox="0 0 400 60"
+      className={`text-foreground ${className}`}
+      role="img"
+      aria-label="SerikaGifs"
+      style={{ display: 'block' }}
+    >
+      <text
+        x="0"
+        y="45"
+        fontFamily="system-ui, -apple-system, sans-serif"
+        fontSize="48"
+        fontWeight="800"
+        letterSpacing="-0.5"
+      >
+        <tspan fill="currentColor">Serika</tspan>
+        <tspan fill="#8b5cf6">Gifs</tspan>
+      </text>
+    </svg>
   )
 
   if (showLink) {

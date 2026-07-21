@@ -1,7 +1,8 @@
 import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 import imageSize from 'image-size'
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) })
 
 async function fixDimensions() {
   console.log('Fetching GIFs with missing dimensions...')

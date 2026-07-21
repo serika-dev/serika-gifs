@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { GifCard, GifCardSkeleton } from '@/components/gif-card'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 import type { Gif } from '@/hooks/use-gifs'
 import {
   Pagination,
@@ -45,6 +45,14 @@ export function GifGrid({
   const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(!initialGifs)
 
+  // Respect the user's "Show NSFW content" appearance setting. When off (the
+  // default), NSFW GIFs are excluded server-side.
+  const { value: appearance, isHydrated } = useLocalStorage<{ showNsfw?: boolean }>(
+    'serika-appearance',
+    { showNsfw: false }
+  )
+  const showNsfw = !!appearance.showNsfw
+
   // Responsive grid classes with better mobile support
   const gridClasses = {
     default: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
@@ -67,6 +75,7 @@ export function GifGrid({
       if (source) params.set('source', source)
       if (sort) params.set('sort', sort)
       if (timeRange) params.set('timeRange', timeRange)
+      if (showNsfw) params.set('nsfw', 'include')
 
       const response = await fetch(`/api/gifs?${params}`)
       const data = await response.json()
@@ -81,17 +90,22 @@ export function GifGrid({
     } finally {
       setIsLoading(false)
     }
-  }, [search, tag, userId, source, sort, timeRange])
+  }, [search, tag, userId, source, sort, timeRange, showNsfw])
 
   // Reset to page 1 and refetch when filters change - but only if not using initialGifs
   useEffect(() => {
-    // Skip fetching if we have initialGifs and no search/filter params
-    if (initialGifs && !search && !tag && !userId && !source) {
+    // Wait for the NSFW preference to hydrate from localStorage so the first
+    // fetch already reflects it (avoids a SFW-only flash + refetch).
+    if (!isHydrated) return
+    // Skip fetching if we have initialGifs and no search/filter params.
+    // But if the user opted into NSFW, refetch so server-rendered SFW-only
+    // initial results get replaced with the NSFW-inclusive set.
+    if (initialGifs && !search && !tag && !userId && !source && !showNsfw) {
       return
     }
     setPage(1)
     fetchGifs(1)
-  }, [search, tag, userId, source, sort, timeRange])
+  }, [search, tag, userId, source, sort, timeRange, showNsfw, isHydrated])
 
   const goToPage = (pageNum: number) => {
     setPage(pageNum)
