@@ -71,7 +71,7 @@ export default async function HomePage() {
             {/* Search bar */}
             <form action="/search" className="w-full max-w-xl mb-6">
               <div className="relative flex items-center">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 z-10 h-5 w-5 text-muted-foreground pointer-events-none" />
                 <input
                   type="search"
                   name="q"

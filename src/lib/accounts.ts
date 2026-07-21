@@ -16,6 +16,7 @@ export interface AccountUser {
   username: string
   email: string
   avatar?: string
+  banner?: string
   createdAt: string
 }
 
@@ -96,6 +97,7 @@ export async function validateToken(token: string): Promise<ValidateTokenRespons
         username: userData.username,
         email: userData.email,
         avatar: userData.avatar,
+        banner: userData.banner,
         createdAt: userData.joinDate,
       },
     }
