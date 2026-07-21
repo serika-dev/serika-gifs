@@ -3,8 +3,32 @@ import { CategoryCard } from '@/components/category-card'
 import { TagSearch } from '@/components/tag-search'
 import Link from 'next/link'
 import prisma from '@/lib/prisma'
+import type { Metadata } from 'next'
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
 
 export const revalidate = 3600 // Cache the popular-tags grid for an hour
+
+export const metadata: Metadata = {
+  title: 'Browse GIF Tags & Categories | SerikaGIFs',
+  description: 'Explore popular GIF tags and categories. Search and find animated GIFs by topics, reactions, emotions, and more on SerikaGIFs.',
+  keywords: ['gif tags', 'gif categories', 'search gifs', 'animated gifs', 'reactions', 'emotions', 'serikagifs'],
+  alternates: {
+    canonical: `${SITE_URL}/tags`,
+  },
+  openGraph: {
+    title: 'Browse GIF Tags & Categories | SerikaGIFs',
+    description: 'Explore popular GIF tags and categories. Search and find animated GIFs by topics, reactions, emotions, and more on SerikaGIFs.',
+    siteName: 'SerikaGIFs',
+    url: `${SITE_URL}/tags`,
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Browse GIF Tags & Categories | SerikaGIFs',
+    description: 'Explore popular GIF tags and categories. Search and find animated GIFs by topics, reactions, emotions, and more on SerikaGIFs.',
+  },
+}
 
 const GRID_SIZE = 120
 const SIDEBAR_SIZE = 40
@@ -50,8 +74,20 @@ export default async function TagsPage() {
   const tags = await getPopularTags()
   const sidebarTags = tags.slice(0, SIDEBAR_SIZE)
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Browse GIF Tags & Categories",
+    "description": "Explore popular GIF tags and categories on SerikaGIFs.",
+    "url": `${SITE_URL}/tags`
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header />
 
       <main className="container mx-auto px-4 py-8">

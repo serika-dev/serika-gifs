@@ -4,6 +4,30 @@ import { Badge } from '@/components/ui/badge'
 import { Pin } from 'lucide-react'
 import Link from 'next/link'
 import prisma from '@/lib/prisma'
+import type { Metadata } from 'next'
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
+
+export const metadata: Metadata = {
+  title: 'Curated GIF Collections | SerikaGIFs',
+  description: 'Discover curated GIF collections created by the SerikaGIFs community. Browse featured, staff-pinned, and popular collections.',
+  keywords: ['gif collections', 'curated gifs', 'featured gifs', 'playlists', 'serikagifs'],
+  alternates: {
+    canonical: `${SITE_URL}/collections`,
+  },
+  openGraph: {
+    title: 'Curated GIF Collections | SerikaGIFs',
+    description: 'Discover curated GIF collections created by the SerikaGIFs community. Browse featured, staff-pinned, and popular collections.',
+    siteName: 'SerikaGIFs',
+    url: `${SITE_URL}/collections`,
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Curated GIF Collections | SerikaGIFs',
+    description: 'Discover curated GIF collections created by the SerikaGIFs community. Browse featured, staff-pinned, and popular collections.',
+  },
+}
 
 async function getPublicCollections() {
   const collections = await prisma.collection.findMany({
@@ -33,8 +57,20 @@ async function getPublicCollections() {
 export default async function CollectionsPage() {
   const collections = await getPublicCollections()
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Curated GIF Collections",
+    "description": "Discover curated GIF collections created by the SerikaGIFs community.",
+    "url": `${SITE_URL}/collections`
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header />
       
       <main className="container mx-auto px-4 py-8">

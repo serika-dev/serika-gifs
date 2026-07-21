@@ -3,6 +3,9 @@ import { GifGrid } from '@/components/gif-grid'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import prisma from '@/lib/prisma'
+import type { Metadata } from 'next'
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
 
 interface SearchPageProps {
   searchParams: Promise<{ q?: string }>
@@ -57,13 +60,55 @@ async function getMatchingTags(query: string) {
   }).slice(0, 12)
 }
 
+export async function generateMetadata({ searchParams }: SearchPageProps): Promise<Metadata> {
+  const { q } = await searchParams
+  const query = q || ''
+  
+  const title = query ? `Search results for "${query}"` : 'Search GIFs'
+  const description = query
+    ? `Find the best animated GIFs, reaction clips, and tags matching "${query}" on SerikaGIFs. Download and share directly.`
+    : 'Search for amazing animated GIFs, tags, and collections on SerikaGIFs.'
+
+  return {
+    title: `${title} | SerikaGIFs`,
+    description,
+    keywords: query ? [query.toLowerCase(), 'search', 'gifs', 'serikagifs'] : ['search', 'gifs', 'animated gifs', 'serikagifs'],
+    alternates: {
+      canonical: query ? `${SITE_URL}/search?q=${encodeURIComponent(query)}` : `${SITE_URL}/search`,
+    },
+    openGraph: {
+      title: `${title} | SerikaGIFs`,
+      description,
+      siteName: 'SerikaGIFs',
+      url: query ? `${SITE_URL}/search?q=${encodeURIComponent(query)}` : `${SITE_URL}/search`,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary',
+      title: `${title} | SerikaGIFs`,
+      description,
+    },
+  }
+}
+
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q } = await searchParams
   const query = q || ''
   const matchingTags = await getMatchingTags(query)
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SearchResultsPage",
+    "name": query ? `Search results for "${query}"` : "Search GIFs",
+    "url": query ? `${SITE_URL}/search?q=${encodeURIComponent(query)}` : `${SITE_URL}/search`
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header />
 
       <main className="container mx-auto px-4 py-8">

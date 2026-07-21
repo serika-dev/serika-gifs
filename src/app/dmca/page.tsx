@@ -3,9 +3,15 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertTriangle, Mail, FileText, Clock } from 'lucide-react'
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
+
 export const metadata = {
-  title: 'DMCA Policy - SerikaGifs',
-  description: 'DMCA takedown policy and procedures for SerikaGifs',
+  title: 'DMCA Policy - SerikaGIFs',
+  description: 'DMCA and EU Copyright Directive takedown policy and procedures for SerikaGIFs. Submit a copyright infringement claim.',
+  keywords: ['dmca policy', 'copyright infringement', 'takedown request', 'copyright policy', 'serikagifs'],
+  alternates: {
+    canonical: `${SITE_URL}/dmca`,
+  },
 }
 
 export default function DMCAPage() {

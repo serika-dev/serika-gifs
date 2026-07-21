@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { GifGrid } from '@/components/gif-grid'
+import type { Metadata } from 'next'
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -54,6 +57,43 @@ async function getCollection(id: string) {
   return collection
 }
 
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params
+  const collection = await getCollection(id)
+
+  if (!collection || !collection.isPublic) {
+    return {
+      title: 'Collection Not Found | SerikaGIFs',
+    }
+  }
+
+  const title = `${collection.name} GIF Collection`
+  const description = collection.description
+    ? `${collection.description} - Browse the ${collection.name} GIF collection curated by ${collection.user.username} on SerikaGIFs. Contains ${collection._count.gifs} amazing GIFs.`
+    : `Browse the ${collection.name} GIF collection curated by ${collection.user.username} on SerikaGIFs. Contains ${collection._count.gifs} amazing GIFs.`
+
+  return {
+    title: `${title} - Curated by ${collection.user.username} | SerikaGIFs`,
+    description,
+    keywords: [collection.name.toLowerCase(), 'gif collection', 'curated gifs', collection.user.username, 'serikagifs'],
+    alternates: {
+      canonical: `${SITE_URL}/collection/${id}`,
+    },
+    openGraph: {
+      title: `${title} | SerikaGIFs`,
+      description,
+      siteName: 'SerikaGIFs',
+      url: `${SITE_URL}/collection/${id}`,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${title} | SerikaGIFs`,
+      description,
+    },
+  }
+}
+
 export default async function CollectionPage({ params }: Props) {
   const { id } = await params
   const collection = await getCollection(id)
@@ -81,8 +121,26 @@ export default async function CollectionPage({ params }: Props) {
     _count: item.gif._count,
   }))
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": `${collection.name} GIF Collection`,
+    "description": collection.description || `Browse the ${collection.name} GIF collection curated by ${collection.user.username} on SerikaGIFs.`,
+    "url": `${SITE_URL}/collection/${collection.id}`,
+    "numberOfItems": collection._count.gifs,
+    "author": {
+      "@type": "Person",
+      "name": collection.user.username,
+      "url": `${SITE_URL}/user/${collection.user.username}`
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header />
       
       <main className="container mx-auto px-4 py-8">

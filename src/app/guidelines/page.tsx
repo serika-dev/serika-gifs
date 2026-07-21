@@ -4,9 +4,15 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Check, X, AlertTriangle, Shield, Zap, Crown } from 'lucide-react'
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
+
 export const metadata = {
-  title: 'Usage Guidelines - SerikaGifs',
-  description: 'API Usage Guidelines and tier requirements for SerikaGifs',
+  title: 'Usage Guidelines - SerikaGIFs',
+  description: 'API Usage Guidelines, content policies, and tier requirements for the SerikaGIFs developer platform.',
+  keywords: ['api guidelines', 'rate limits', 'developer rules', 'content policy', 'serikagifs'],
+  alternates: {
+    canonical: `${SITE_URL}/guidelines`,
+  },
 }
 
 const TIER_REQUIREMENTS = [

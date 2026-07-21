@@ -12,6 +12,12 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/auth-context'
 
+interface BgImageState {
+  url: string
+  author: string
+  profile: string
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const { register, isAuthenticated, isLoading: authLoading } = useAuth()
@@ -20,6 +26,27 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [bgImage, setBgImage] = useState<BgImageState | null>(null)
+
+  useEffect(() => {
+    fetch('/api/bg-image')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && data.bgImage) {
+          setBgImage(data.bgImage)
+        } else {
+          throw new Error('Failed to load background image')
+        }
+      })
+      .catch(() => {
+        // Fallback default
+        setBgImage({
+          url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+          author: 'Milad Fakurian',
+          profile: 'https://unsplash.com/@fakurian'
+        })
+      })
+  }, [])
 
   // Redirect if already logged in
   useEffect(() => {
@@ -61,21 +88,35 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex items-center justify-center mb-4">
-            <Logo width={160} height={24} showLink={false} />
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#030014]">
+      {/* Background Image with blur & overlay */}
+      {bgImage && (
+        <div 
+          className="absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out scale-105"
+          style={{ 
+            backgroundImage: `url(${bgImage.url})`,
+            filter: 'blur(8px) brightness(0.35)'
+          }}
+        />
+      )}
+      {/* Dark overlay grid / radial gradient */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-transparent to-black/80 z-0 pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.1)_0%,rgba(0,0,0,0.7)_100%)] z-0 pointer-events-none" />
+
+      <Card className="w-full max-w-md border-white/10 bg-black/60 backdrop-blur-xl shadow-[0_0_50px_rgba(0,0,0,0.8),_0_0_80px_rgba(139,92,246,0.06)] relative z-10 text-white">
+        <CardHeader className="space-y-1.5 text-center pb-6">
+          <div className="flex items-center justify-center mb-5">
+            <Logo width={180} height={27} showLink={false} center={true} className="filter drop-shadow-[0_0_10px_rgba(139,92,246,0.25)]" />
           </div>
-          <CardTitle className="text-xl">Create an account</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl font-bold tracking-tight text-white">Create an account</CardTitle>
+          <CardDescription className="text-sm text-slate-400">
             Join SerikaGIFs to upload and share your favorite GIFs
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">Username</Label>
               <Input
                 id="username"
                 type="text"
@@ -84,10 +125,11 @@ export default function RegisterPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 disabled={isLoading}
+                className="bg-white/5 border-white/10 focus:border-violet-500 focus:ring-violet-500/20 text-white placeholder-slate-500"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -96,10 +138,11 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
+                className="bg-white/5 border-white/10 focus:border-violet-500 focus:ring-violet-500/20 text-white placeholder-slate-500"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -108,10 +151,11 @@ export default function RegisterPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isLoading}
+                className="bg-white/5 border-white/10 focus:border-violet-500 focus:ring-violet-500/20 text-white placeholder-slate-500"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">Confirm Password</Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -120,13 +164,14 @@ export default function RegisterPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 disabled={isLoading}
+                className="bg-white/5 border-white/10 focus:border-violet-500 focus:ring-violet-500/20 text-white placeholder-slate-500"
               />
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
+          <CardFooter className="flex flex-col space-y-4 pt-4">
             <Button
               type="submit"
-              className="w-full"
+              className="w-full bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white transition-colors duration-200"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -138,15 +183,26 @@ export default function RegisterPage() {
                 'Create account'
               )}
             </Button>
-            <p className="text-sm text-muted-foreground text-center">
+            <p className="text-sm text-slate-400 text-center">
               Already have an account?{' '}
-              <Link href="/login" className="text-primary hover:underline">
+              <Link href="/login" className="text-violet-400 hover:underline hover:text-violet-300 transition-colors font-medium">
                 Sign in
               </Link>
             </p>
           </CardFooter>
         </form>
       </Card>
+
+      {/* Attribution */}
+      {bgImage && (
+        <div className="absolute bottom-4 right-4 text-[10px] sm:text-xs text-white/40 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/5 z-20">
+          Art by{' '}
+          <a href={bgImage.profile} target="_blank" rel="noopener noreferrer" className="hover:text-violet-400 underline transition-colors font-medium">
+            {bgImage.author}
+          </a>
+        </div>
+      )}
     </div>
   )
 }
+

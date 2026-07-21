@@ -1,9 +1,15 @@
 import { Header } from '@/components/header'
 import Link from 'next/link'
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
+
 export const metadata = {
-  title: 'Privacy Policy - SerikaGifs',
-  description: 'Privacy Policy for SerikaGifs - GDPR compliant',
+  title: 'Privacy Policy - SerikaGIFs',
+  description: 'Privacy Policy for SerikaGIFs - GDPR compliant data handling, user privacy information, and cookie policy.',
+  keywords: ['privacy policy', 'gdpr compliant', 'data protection', 'cookie policy', 'serikagifs'],
+  alternates: {
+    canonical: `${SITE_URL}/privacy`,
+  },
 }
 
 export default function PrivacyPage() {

@@ -1,9 +1,15 @@
 import { Header } from '@/components/header'
 import Link from 'next/link'
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
+
 export const metadata = {
-  title: 'Terms of Service - SerikaGifs',
-  description: 'Terms of Service for using SerikaGifs',
+  title: 'Terms of Service - SerikaGIFs',
+  description: 'Terms of Service, legal agreement, and usage policies for the SerikaGIFs platform.',
+  keywords: ['terms of service', 'legal agreement', 'user terms', 'serikagifs'],
+  alternates: {
+    canonical: `${SITE_URL}/terms`,
+  },
 }
 
 export default function TermsPage() {

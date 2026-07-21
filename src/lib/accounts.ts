@@ -112,8 +112,15 @@ export async function validateToken(token: string): Promise<ValidateTokenRespons
 
 export async function getUser(userId: string): Promise<AccountUser | null> {
   try {
-    const response = await accountsApi.get(`/api/users/${userId}`)
-    return response.data.user
+    const response = await accountsApi.post('/internal/get-user', 
+      { id: userId },
+      {
+        headers: {
+          'x-service-key': AUTH_INTERNAL_KEY,
+        },
+      }
+    )
+    return response.data.success ? response.data.user : null
   } catch {
     return null
   }

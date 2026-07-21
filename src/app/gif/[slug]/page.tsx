@@ -12,6 +12,14 @@ import type { Metadata } from 'next'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
 async function getGifForMetadata(slug: string) {
   return prisma.gif.findUnique({
     where: { slug },
@@ -24,6 +32,16 @@ async function getGifForMetadata(slug: string) {
       thumbnailUrl: true,
       width: true,
       height: true,
+      fileSize: true,
+      tags: {
+        select: {
+          tag: {
+            select: {
+              name: true,
+            }
+          }
+        }
+      }
     },
   })
 }
@@ -34,12 +52,22 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   
   if (!gif) {
     return {
-      title: 'GIF Not Found',
+      title: 'GIF Not Found | SerikaGIFs',
     }
   }
 
   const title = gif.title || 'GIF'
-  const description = `Click to view the GIF`
+  const tagsList = gif.tags.map(t => t.tag.name).filter(name => name !== 'import')
+  const formattedBytes = formatBytes(gif.fileSize)
+  const description = gif.description
+    ? `${gif.description} - Watch, share, and download the ${title} animated GIF on SerikaGIFs. Dimensions: ${gif.width}x${gif.height}, size: ${formattedBytes}.`
+    : `Watch, share, and download the ${title} animated GIF on SerikaGIFs. Dimensions: ${gif.width}x${gif.height}, size: ${formattedBytes}.${tagsList.length > 0 ? ` Tags: ${tagsList.join(', ')}.` : ''}`
+
+  const keywords = [
+    title.toLowerCase(),
+    ...tagsList.map(t => t.toLowerCase()),
+    'gif', 'animated gif', 'download gif', 'free gif', 'share gif', 'serikagifs'
+  ]
 
   // Tenor's exact metadata structure for Discord inline video rendering:
   // - og:type = video.other
@@ -80,12 +108,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 
   return {
-    title: `${title} | SerikaGifs`,
+    title: `${title} GIF - Download & Share | SerikaGIFs`,
     description,
+    keywords,
+    alternates: {
+      canonical: `${SITE_URL}/gif/${slug}`,
+    },
     openGraph: {
-      title,
+      title: `${title} GIF`,
       description,
-      siteName: 'SerikaGifs',
+      siteName: 'SerikaGIFs',
       type: 'video.other',
       // Point og:url to the GIF file directly - this makes Discord render it as direct media
       url: gifUrl,
@@ -102,7 +134,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     },
     twitter: {
       card: 'player',
-      title,
+      title: `${title} GIF`,
       description,
       images: [gifUrl],
       players: mp4Url ? [
@@ -175,13 +207,6 @@ async function getGif(slug: string) {
   }
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
 
 export default async function GifPage({
   params,
@@ -195,8 +220,51 @@ export default async function GifPage({
     notFound()
   }
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "ImageObject",
+        "@id": `${SITE_URL}/gif/${slug}#image`,
+        "url": gif.url,
+        "contentUrl": gif.url,
+        "thumbnailUrl": gif.thumbnailUrl || gif.url,
+        "name": gif.title,
+        "description": gif.description || `Watch, share, and download the ${gif.title} GIF on SerikaGIFs.`,
+        "width": gif.width,
+        "height": gif.height,
+        "encodingFormat": "image/gif",
+        "author": {
+          "@type": "Person",
+          "name": gif.user.username,
+          "url": `${SITE_URL}/user/${gif.user.username}`
+        },
+        "datePublished": gif.createdAt.toISOString()
+      },
+      ...(gif.mp4Url || gif.webmUrl ? [{
+        "@type": "VideoObject",
+        "@id": `${SITE_URL}/gif/${slug}#video`,
+        "name": gif.title,
+        "description": gif.description || `Watch, share, and download the ${gif.title} GIF on SerikaGIFs.`,
+        "thumbnailUrl": gif.thumbnailUrl || gif.url,
+        "uploadDate": gif.createdAt.toISOString(),
+        "contentUrl": gif.mp4Url || gif.webmUrl,
+        "embedUrl": `${SITE_URL}/gif/${slug}`,
+        "interactionStatistic": {
+          "@type": "InteractionCounter",
+          "interactionType": { "@type": "WatchAction" },
+          "userInteractionCount": gif.views
+        }
+      }] : [])
+    ]
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header />
       
       <main className="container mx-auto px-4 py-8">

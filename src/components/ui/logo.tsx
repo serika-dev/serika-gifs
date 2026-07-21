@@ -6,6 +6,7 @@ interface LogoProps {
   height?: number
   linkTo?: string
   showLink?: boolean
+  center?: boolean
 }
 
 export function Logo({
@@ -14,6 +15,7 @@ export function Logo({
   height = 21,
   linkTo = '/',
   showLink = true,
+  center = false,
 }: LogoProps) {
   // Inline SVG so the wordmark uses `currentColor` for "Serika" — this makes it
   // legible in both light and dark themes (the old /logo.svg was hardcoded white
@@ -29,8 +31,9 @@ export function Logo({
       style={{ display: 'block' }}
     >
       <text
-        x="0"
+        x={center ? "200" : "0"}
         y="45"
+        textAnchor={center ? "middle" : "start"}
         fontFamily="system-ui, -apple-system, sans-serif"
         fontSize="48"
         fontWeight="800"

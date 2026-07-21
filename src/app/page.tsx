@@ -5,6 +5,30 @@ import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { TrendingUp, Upload, Search } from 'lucide-react'
 import prisma from '@/lib/prisma'
+import type { Metadata } from 'next'
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://gifs.serika.dev'
+
+export const metadata: Metadata = {
+  title: 'SerikaGIFs - Discover, Share & Download Animated GIFs',
+  description: 'Explore millions of high-quality animated GIFs, reaction clips, and curated collections. Upload and share your favorite GIFs with the world or integrate our fast developer API.',
+  keywords: ['gifs', 'animated gifs', 'reaction gifs', 'share gifs', 'gif database', 'serikagifs', 'free gifs', 'download gifs', 'developer api'],
+  alternates: {
+    canonical: SITE_URL,
+  },
+  openGraph: {
+    title: 'SerikaGIFs - Discover, Share & Download Animated GIFs',
+    description: 'Explore millions of high-quality animated GIFs, reaction clips, and curated collections. Upload and share your favorite GIFs with the world or integrate our fast developer API.',
+    siteName: 'SerikaGIFs',
+    url: SITE_URL,
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'SerikaGIFs - Discover, Share & Download Animated GIFs',
+    description: 'Explore millions of high-quality animated GIFs, reaction clips, and curated collections. Upload and share your favorite GIFs with the world or integrate our fast developer API.',
+  },
+}
 
 async function getPopularTags() {
   const tags = await prisma.tag.findMany({
@@ -34,8 +58,24 @@ async function getPopularTags() {
 export default async function HomePage() {
   const popularTags = await getPopularTags()
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "SerikaGIFs",
+    "url": SITE_URL,
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": `${SITE_URL}/search?q={search_term_string}`,
+      "query-input": "required name=search_term_string"
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header />
 
       {/* Hero Section */}

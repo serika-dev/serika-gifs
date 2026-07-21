@@ -101,12 +101,12 @@ export const gifsApi = {
   },
 
   trending: (params?: { cursor?: string; limit?: number }) => {
-    const searchParams = new URLSearchParams()
+    const searchParams = new URLSearchParams({ sort: 'trending' })
     if (params?.cursor) searchParams.set('cursor', params.cursor)
     if (params?.limit) searchParams.set('limit', String(params.limit))
     
     return request<{ gifs: any[]; nextCursor?: string }>(
-      `${API_ENDPOINTS.gifs.trending}?${searchParams}`
+      `${API_ENDPOINTS.gifs.list}?${searchParams}`
     )
   },
 
