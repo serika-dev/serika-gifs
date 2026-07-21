@@ -8,7 +8,7 @@ interface UserGifsProps {
   userId: string
   username: string
   search?: string
-  sort?: 'newest' | 'oldest'
+  sort?: 'trending' | 'newest' | 'popular' | 'most-viewed' | 'random'
 }
 
 export function UserGifs({ userId, username, search, sort = 'newest' }: UserGifsProps) {

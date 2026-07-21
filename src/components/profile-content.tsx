@@ -20,7 +20,7 @@ interface ProfileContentProps {
 export function ProfileContent({ userId, username }: ProfileContentProps) {
   const [searchVal, setSearchVal] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'popular' | 'most-viewed' | 'trending'>('newest')
   const [activeTab, setActiveTab] = useState('gifs')
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -75,10 +75,22 @@ export function ProfileContent({ userId, username }: ProfileContentProps) {
                 Newest
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => setSortOrder('oldest')}
-                className={sortOrder === 'oldest' ? 'bg-accent font-medium' : ''}
+                onClick={() => setSortOrder('popular')}
+                className={sortOrder === 'popular' ? 'bg-accent font-medium' : ''}
               >
-                Oldest
+                Popular
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => setSortOrder('most-viewed')}
+                className={sortOrder === 'most-viewed' ? 'bg-accent font-medium' : ''}
+              >
+                Most Viewed
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => setSortOrder('trending')}
+                className={sortOrder === 'trending' ? 'bg-accent font-medium' : ''}
+              >
+                Trending
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
