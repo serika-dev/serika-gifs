@@ -18,7 +18,7 @@ export interface GifToImport {
   title: string
   gifUrl: string
   mp4Url?: string  // High quality MP4 URL from source
-  webmUrl?: string // WebM URL from source (Tenor only)
+  webmUrl?: string // WebM URL from source (Tenor, Klipy)
   previewUrl?: string
   sourceUrl?: string
   width?: number
@@ -237,7 +237,7 @@ export async function importSingleGif(
       }
     }
     
-    // Download and upload WebM to our CDN (Tenor only)
+    // Download and upload WebM to our CDN (Tenor, Klipy)
     let webmUrl: string | null = null
     if (gif.webmUrl) {
       try {
@@ -290,7 +290,7 @@ export async function importSingleGif(
         title: gif.title || options.query,
         url,
         mp4Url,  // Now using our CDN URL
-        webmUrl, // WebM on our CDN (Tenor only)
+        webmUrl, // WebM on our CDN (Tenor, Klipy)
         thumbnailUrl,
         width,
         height,

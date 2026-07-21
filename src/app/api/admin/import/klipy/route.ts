@@ -12,6 +12,7 @@ interface NormalizedKlipyGif {
   title?: string
   gifUrl?: string
   mp4Url?: string
+  webmUrl?: string
   previewUrl?: string
   sourceUrl?: string
   width?: number
@@ -45,6 +46,8 @@ function normalizeKlipyItem(gif: any): NormalizedKlipyGif {
     title: gif.title || gif.slug || undefined,
     gifUrl: hdGif.url || '',
     mp4Url: hd.mp4?.url || md.mp4?.url || sm.mp4?.url || undefined,
+    // Klipy provides WebM on every rendition (hd/md/sm/xs) — prefer highest quality.
+    webmUrl: hd.webm?.url || md.webm?.url || sm.webm?.url || xs.webm?.url || undefined,
     previewUrl: previewGif.url || undefined,
     sourceUrl: gif.url || gif.source || undefined,
     width: hdGif.width || 0,
@@ -147,6 +150,7 @@ export async function POST(request: NextRequest) {
           title: result.title || query,
           gifUrl: result.gifUrl || '',
           mp4Url: result.mp4Url,
+          webmUrl: result.webmUrl,
           previewUrl: result.previewUrl,
           sourceUrl: result.sourceUrl,
           width: result.width || 0,
